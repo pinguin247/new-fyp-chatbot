@@ -6,7 +6,7 @@ import { TabBarIcon } from '@/components/navigation/TabBarIcon';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { LoginProvider, useLogin } from '../context/LoginContext';
-import LoginScreen from './login';
+import LoginScreen from '../screens/login';
 
 function TabLayout() {
   const colorScheme = useColorScheme();
