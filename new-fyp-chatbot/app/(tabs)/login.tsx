@@ -1,7 +1,7 @@
 // components/LoginScreen.tsx
 
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, TextInput, Button, ActivityIndicator } from 'react-native';
+import { StyleSheet, TextInput, Button, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useLogin } from '../context/LoginContext';
@@ -20,13 +20,16 @@ export default function LoginScreen() {
 
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: '256328138389-k6qq5pjcrapmm5u0smkr0gf1tllvuemq.apps.googleusercontent.com',
+      webClientId:
+        '256328138389-k6qq5pjcrapmm5u0smkr0gf1tllvuemq.apps.googleusercontent.com',
     });
 
     // Preload Google Play Services
     const preloadGooglePlayServices = async () => {
       try {
-        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        await GoogleSignin.hasPlayServices({
+          showPlayServicesUpdateDialog: true,
+        });
       } catch (error) {
         console.error('Google Play Services are not available:', error);
       }
