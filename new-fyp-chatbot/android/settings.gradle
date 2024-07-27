@@ -1,4 +1,4 @@
-rootProject.name = 'new-fyp-chatbot'
+rootProject.name = 'FitBuddy'
 
 dependencyResolutionManagement {
   versionCatalogs {
