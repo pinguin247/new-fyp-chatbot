@@ -11,14 +11,50 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../../configs/FirebaseConfig';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithCredential,
+} from 'firebase/auth';
 
 export default function SignIn() {
   const navigation = useNavigation();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+
+  GoogleSignin.configure({
+    webClientId:
+      '256328138389-k6qq5pjcrapmm5u0smkr0gf1tllvuemq.apps.googleusercontent.com',
+  });
+
+  async function onGoogleButtonPress() {
+    try {
+      // Ensure the account chooser appears
+      await GoogleSignin.signOut();
+
+      // Check if your device supports Google Play
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      });
+      // Get the user's ID token
+      const { idToken } = await GoogleSignin.signIn();
+
+      // Create a Google credential with the token
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+
+      // Sign-in the user with the credential
+      const userCredential = await signInWithCredential(auth, googleCredential);
+      const user = userCredential.user;
+      console.log(user);
+      router.replace('/home'); // Navigate to home
+    } catch (error) {
+      console.error(error);
+      ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+    }
+  }
 
   useEffect(() => {
     navigation.setOptions({
@@ -119,7 +155,10 @@ export default function SignIn() {
         <View style={styles.separatorLine} />
       </View>
 
-      <TouchableOpacity style={styles.googleButton}>
+      <TouchableOpacity
+        style={styles.googleButton}
+        onPress={onGoogleButtonPress}
+      >
         <Image
           source={require('../../../assets/images/google.png')}
           style={styles.googleLogo}

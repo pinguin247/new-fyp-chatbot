@@ -5,7 +5,6 @@ import { Redirect } from 'expo-router';
 
 export default function Index() {
   const user = auth.currentUser;
-  console.log('TESTNG LOGIN', user);
 
   return (
     <View style={{ flex: 1 }}>
