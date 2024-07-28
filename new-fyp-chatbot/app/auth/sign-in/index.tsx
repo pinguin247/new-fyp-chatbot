@@ -8,7 +8,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { useNavigation, Link } from 'expo-router';
+import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -37,8 +37,7 @@ export default function SignIn() {
         // Signed in
         const user = userCredential.user;
         console.log(user);
-        // Navigate to the next screen or dashboard
-        //navigation.navigate('Home'); // Adjust the route as necessary
+        router.replace('/home');
       })
       .catch((error) => {
         const errorMessage = error.message;

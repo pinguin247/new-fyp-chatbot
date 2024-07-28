@@ -8,7 +8,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { useNavigation, Link } from 'expo-router';
+import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -39,8 +39,7 @@ export default function SignUp() {
         // Signed up
         const user = userCredential.user;
         console.log(user);
-        // You can navigate to a different screen after successful signup if needed
-        //navigation.navigate('Home'); // Replace 'Home' with your desired route
+        router.replace('/home');
       })
       .catch((error) => {
         const errorCode = error.code;
