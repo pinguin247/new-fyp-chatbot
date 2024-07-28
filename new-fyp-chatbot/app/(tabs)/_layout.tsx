@@ -1,65 +1,52 @@
-// _layout.tsx
-
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { TabBarIcon } from '@/components/navigation/TabBarIcon';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { LoginProvider, useLogin } from '../context/LoginContext';
-import LoginScreen from './login';
 
-function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
+        tabBarActiveTintColor: Colors.NAVY,
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon
-              name={focused ? 'home' : 'home-outline'}
-              color={color}
-            />
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="chatbot"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon
-              name={focused ? 'code-slash' : 'code-slash-outline'}
-              color={color}
-            />
+          tabBarLabel: 'Chatbot',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="chatbox-ellipses" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          tabBarLabel: 'Schedule',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="calendar" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-circle" size={24} color={color} />
           ),
         }}
       />
     </Tabs>
   );
-}
-
-export default function App() {
-  return (
-    <LoginProvider>
-      <RootNavigator />
-    </LoginProvider>
-  );
-}
-
-function RootNavigator() {
-  const { isLoggedIn } = useLogin();
-
-  if (!isLoggedIn) {
-    return <LoginScreen />;
-  }
-
-  return <TabLayout />;
 }

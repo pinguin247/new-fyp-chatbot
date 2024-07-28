@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "new-fyp-chatbot",
+    "name": "FitTrackSG",
     "slug": "new-fyp-chatbot",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.newfypchatbot"
