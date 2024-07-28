@@ -1,12 +1,25 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ToastAndroid,
+} from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useNavigation, Link } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../../configs/FirebaseConfig';
 
 export default function SignUp() {
   const navigation = useNavigation();
-  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [fullName, setfullName] = useState<string>('');
 
   useEffect(() => {
     navigation.setOptions({
@@ -14,13 +27,39 @@ export default function SignUp() {
     });
   }, [navigation]);
 
+  const onCreateAccount = () => {
+    if (email === '' || password === '' || fullName === '') {
+      console.log('Input fields cannot be empty');
+      ToastAndroid.show('Please enter all details', ToastAndroid.BOTTOM);
+      return;
+    }
+
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed up
+        const user = userCredential.user;
+        console.log(user);
+        // You can navigate to a different screen after successful signup if needed
+        //navigation.navigate('Home'); // Replace 'Home' with your desired route
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        console.log(errorMessage, errorCode);
+        // Handle errors here (e.g., show an alert)
+      });
+  };
+
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
         <Icon name="arrow-back" size={24} color={Colors.NAVY} />
       </TouchableOpacity>
       <View style={styles.subcontainer}>
@@ -28,35 +67,67 @@ export default function SignUp() {
         <Text style={styles.subtitle}>Please register down here</Text>
       </View>
       <View style={styles.inputContainer}>
-        <Icon name="person-outline" size={20} color={Colors.GRAY} style={styles.inputIcon} />
+        <Icon
+          name="person-outline"
+          size={20}
+          color={Colors.GRAY}
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Full name"
           placeholderTextColor={Colors.GRAY}
+          value={fullName}
+          onChangeText={setfullName}
+          autoCapitalize="none"
         />
       </View>
       <View style={styles.inputContainer}>
-        <Icon name="mail-outline" size={20} color={Colors.GRAY} style={styles.inputIcon} />
+        <Icon
+          name="mail-outline"
+          size={20}
+          color={Colors.GRAY}
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Email"
           placeholderTextColor={Colors.GRAY}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
       </View>
       <View style={styles.inputContainer}>
-        <Icon name="lock-closed-outline" size={20} color={Colors.GRAY} style={styles.inputIcon} />
+        <Icon
+          name="lock-closed-outline"
+          size={20}
+          color={Colors.GRAY}
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Password"
           placeholderTextColor={Colors.GRAY}
           secureTextEntry={!passwordVisible}
+          value={password}
+          onChangeText={setPassword}
+          autoCapitalize="none"
         />
-        <TouchableOpacity onPress={togglePasswordVisibility} style={styles.icon}>
-          <Icon name={passwordVisible ? "eye-off" : "eye"} size={20} color={Colors.GRAY} />
+        <TouchableOpacity
+          onPress={togglePasswordVisibility}
+          style={styles.icon}
+        >
+          <Icon
+            name={passwordVisible ? 'eye-off' : 'eye'}
+            size={20}
+            color={Colors.GRAY}
+          />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.loginButton}>
+      <TouchableOpacity style={styles.loginButton} onPress={onCreateAccount}>
         <Text style={styles.loginButtonText}>REGISTER</Text>
       </TouchableOpacity>
 
@@ -75,7 +146,7 @@ export default function SignUp() {
       </TouchableOpacity>
 
       <View style={styles.registerContainer}>
-        <Text style={styles.registerText}>Already have an acccount? </Text>
+        <Text style={styles.registerText}>Already have an account? </Text>
         <Link href="auth/sign-in" style={styles.registerLink}>
           Log in
         </Link>
@@ -187,7 +258,7 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontFamily: 'Outfit',
-    color: Colors.BLACK,
+    color: Colors.PRIMARY,
     fontSize: 16,
   },
   registerContainer: {

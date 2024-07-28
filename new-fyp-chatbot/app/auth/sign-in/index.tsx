@@ -1,12 +1,24 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ToastAndroid,
+} from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useNavigation, Link } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../../configs/FirebaseConfig';
 
 export default function SignIn() {
   const navigation = useNavigation();
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
 
   useEffect(() => {
     navigation.setOptions({
@@ -14,13 +26,39 @@ export default function SignIn() {
     });
   }, [navigation]);
 
+  const onSignIn = () => {
+    if (email === '' || password === '') {
+      console.log('Input fields cannot be empty');
+      ToastAndroid.show('Please enter all details', ToastAndroid.BOTTOM);
+      return;
+    }
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed in
+        const user = userCredential.user;
+        console.log(user);
+        // Navigate to the next screen or dashboard
+        //navigation.navigate('Home'); // Adjust the route as necessary
+      })
+      .catch((error) => {
+        const errorMessage = error.message;
+        console.log(errorMessage);
+        if (errorMessage == 'Firebase: Error (auth/invalid-email).') {
+          ToastAndroid.show('Invalid Credentials', ToastAndroid.LONG);
+        }
+      });
+  };
+
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
   };
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
         <Icon name="arrow-back" size={24} color={Colors.NAVY} />
       </TouchableOpacity>
       <View style={styles.subcontainer}>
@@ -28,27 +66,51 @@ export default function SignIn() {
         <Text style={styles.subtitle}>Please enter your account here</Text>
       </View>
       <View style={styles.inputContainer}>
-        <Icon name="mail-outline" size={20} color={Colors.GRAY} style={styles.inputIcon} />
+        <Icon
+          name="mail-outline"
+          size={20}
+          color={Colors.GRAY}
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Email"
           placeholderTextColor={Colors.GRAY}
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
       </View>
       <View style={styles.inputContainer}>
-        <Icon name="lock-closed-outline" size={20} color={Colors.GRAY} style={styles.inputIcon} />
+        <Icon
+          name="lock-closed-outline"
+          size={20}
+          color={Colors.GRAY}
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Password"
           placeholderTextColor={Colors.GRAY}
           secureTextEntry={!passwordVisible}
+          value={password}
+          onChangeText={setPassword}
+          autoCapitalize="none"
         />
-        <TouchableOpacity onPress={togglePasswordVisibility} style={styles.icon}>
-          <Icon name={passwordVisible ? "eye-off" : "eye"} size={20} color={Colors.GRAY} />
+        <TouchableOpacity
+          onPress={togglePasswordVisibility}
+          style={styles.icon}
+        >
+          <Icon
+            name={passwordVisible ? 'eye-off' : 'eye'}
+            size={20}
+            color={Colors.GRAY}
+          />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.loginButton}>
+      <TouchableOpacity style={styles.loginButton} onPress={onSignIn}>
         <Text style={styles.loginButtonText}>LOGIN</Text>
       </TouchableOpacity>
 
@@ -179,7 +241,7 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     fontFamily: 'Outfit',
-    color: Colors.BLACK,
+    color: Colors.PRIMARY,
     fontSize: 16,
   },
   registerContainer: {
