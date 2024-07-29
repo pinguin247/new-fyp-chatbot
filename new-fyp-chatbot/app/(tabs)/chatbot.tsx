@@ -1,128 +1,97 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '@/constants/Colors';
+import { GiftedChat, IMessage } from 'react-native-gifted-chat';
+import { Image, LogBox  } from 'react-native';
 
-interface Message {
-  id: string;
-  text: string;
-  user: 'bot' | 'user';
-}
+LogBox.ignoreLogs([
+    'Warning: Avatar: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.',
+  ]);
 
 export default function chatbot() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<IMessage[]>([
+    {
+      _id: 1,
+      text: 'Hello! I am your GFG chatbot. How can I help you?',
+      createdAt: new Date(),
+      user: {
+        _id: 2,
+        name: 'Chatbot',
+        avatar: 'https://placekitten.com/200/300',
+      },
+    },
+  ]);
 
-  const sendMessage = () => {
-    if (inputText.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText,
-        user: 'user',
-      };
+  const handleSend = (newMessages: IMessage[] = []) => {
+    setMessages((previousMessages) =>
+      GiftedChat.append(previousMessages, newMessages),
+    );
 
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
-      setInputText('');
+    const userMessage = newMessages[0].text;
+    const botResponse = generateChatbotResponse(userMessage);
 
-      // Simulate bot response
-      setTimeout(() => {
-        const botMessage: Message = {
-          id: Date.now().toString(),
-          text: 'This is a bot response',
-          user: 'bot',
-        };
-        setMessages((prevMessages) => [...prevMessages, botMessage]);
-      }, 1000);
+    setMessages((previousMessages) =>
+      GiftedChat.append(previousMessages, [
+        {
+          _id: Math.round(Math.random() * 1000000),
+          text: botResponse,
+          createdAt: new Date(),
+          user: {
+            _id: 2,
+            name: 'Chatbot',
+            avatar: 'https://placekitten.com/200/300',
+          },
+        },
+      ]),
+    );
+  };
+
+  const generateChatbotResponse = (userMessage: string): string => {
+    switch (userMessage.toLowerCase()) {
+      case 'hello':
+        return 'Hi there! How can I assist you today?';
+      case 'how are you':
+        return 'I am just a chatbot, but thanks for asking!';
+      case 'bye':
+        return 'Goodbye! If you have more questions, feel free to ask.';
+      case 'javascript':
+        return 'JavaScript is a programming language commonly used to create interactive effects within web browsers.';
+      case 'python':
+        return 'Python is a versatile and easy-to-read programming language often used for web development, data analysis, and artificial intelligence.';
+      case 'html':
+        return 'HTML (Hypertext Markup Language) is the standard markup language for documents designed to be displayed in a web browser.';
+      case 'css':
+        return 'CSS (Cascading Style Sheets) is a style sheet language used for describing the look and formatting of a document written in HTML.';
+      case 'git':
+        return 'Git is a distributed version control system used to track changes in source code during software development.';
+      case 'api':
+        return 'An API (Application Programming Interface) is a set of rules that allows one software application to interact with another.';
+      case 'algorithm':
+        return 'An algorithm is a step-by-step procedure or formula for solving a problem or accomplishing a task in computer science.';
+      case 'database':
+        return 'A database is an organized collection of data, typically stored and accessed electronically from a computer system.';
+      default:
+        return "I'm sorry, I didn't understand that. Can you please rephrase?";
     }
   };
 
-  const renderItem = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageContainer,
-        item.user === 'user' ? styles.userMessage : styles.botMessage,
-      ]}
-    >
-      <Text style={styles.messageText}>{item.text}</Text>
-    </View>
-  );
+  const renderAvatar = (props: any) => {
+    // Only render avatar for the chatbot
+    if (props.currentMessage.user._id === 2) {
+      return (
+        <Image
+          source={require('../../assets/images/icon.png')}
+          style={{ width: 40, height: 40, borderRadius: 20 }}
+        />
+      );
+    }
+    return null;
+  };
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messageList}
-      />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message"
-          placeholderTextColor={Colors.GRAY}
-          value={inputText}
-          onChangeText={setInputText}
-        />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Icon name="send" size={24} color={Colors.WHITE} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <GiftedChat
+      messages={messages}
+      onSend={(newMessages) => handleSend(newMessages)}
+      user={{ _id: 1, name: 'User' }}
+      renderAvatar={renderAvatar}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.WHITE,
-  },
-  messageList: {
-    padding: 10,
-  },
-  messageContainer: {
-    marginVertical: 5,
-    padding: 10,
-    borderRadius: 10,
-    maxWidth: '80%',
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: Colors.NAVY,
-  },
-  botMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.LIGHTGRAY,
-  },
-  messageText: {
-    color: Colors.WHITE,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: Colors.GRAY,
-    padding: 10,
-  },
-  input: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.LIGHTGRAY,
-    marginRight: 10,
-    color: Colors.PRIMARY,
-  },
-  sendButton: {
-    backgroundColor: Colors.NAVY,
-    padding: 10,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
