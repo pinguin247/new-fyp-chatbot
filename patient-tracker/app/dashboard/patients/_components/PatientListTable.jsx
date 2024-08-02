@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Trash, Search } from 'lucide-react';
-import { AgGridReact } from 'ag-grid-react'; // React Data Grid Component
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Trash, Search } from "lucide-react";
+import { AgGridReact } from "ag-grid-react"; // React Data Grid Component
 import "ag-grid-community/styles/ag-grid.css"; // Mandatory CSS required by the Data Grid
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Optional Theme applied to the Data Grid
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 function PatientListTable() {
   const pagination = true;
@@ -11,7 +23,35 @@ function PatientListTable() {
   const paginationPageSizeSelector = [25, 50, 100];
 
   const CustomButtons = (props) => {
-    return <Button variant="destructive"><Trash /></Button>;
+    return (
+      <AlertDialog>
+        <AlertDialogTrigger>
+          {" "}
+          <Button variant="destructive">
+            <Trash />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your
+              account and remove your data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                toast("Patient Deleted Successfully");
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
   };
 
   // Column Definitions: Defines the columns to be displayed.
@@ -20,7 +60,7 @@ function PatientListTable() {
     { field: "name", filter: true },
     { field: "email", filter: true },
     { field: "contact", filter: true },
-    { field: "action", cellRenderer: CustomButtons }
+    { field: "action", cellRenderer: CustomButtons },
   ]);
 
   // Row Data: The data to be displayed.
@@ -30,21 +70,24 @@ function PatientListTable() {
     { make: "Toyota", model: "Corolla", price: 29600, electric: false },
   ]);
 
-  const [searchInput, setSearchInput]=useState();
+  const [searchInput, setSearchInput] = useState();
 
   return (
-    <div style={{marginTop:30, marginBottom:30}}>
+    <div style={{ marginTop: 30, marginBottom: 30 }}>
       <div
         className="ag-theme-quartz" // applying the Data Grid theme
         style={{ height: 500 }} // the Data Grid will fill the size of the parent container
       >
-        <div className='flex justify-start' style={{marginBottom:15}}>
-          <div className='p-2 rounded-lg border shadow-sm flex items-center gap-2' style={{ width: '50%', maxWidth: '400px' }}>
-            <Search className='text-gray-500' />
-            <input 
-              type='text' 
-              placeholder='Search Patients' 
-              className='bg-white outline-none w-full p-1 focus:outline-none' 
+        <div className="flex justify-start" style={{ marginBottom: 15 }}>
+          <div
+            className="p-2 rounded-lg border shadow-sm flex items-center gap-2"
+            style={{ width: "50%", maxWidth: "400px" }}
+          >
+            <Search className="text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search Patients"
+              className="bg-white outline-none w-full p-1 focus:outline-none"
               onChange={(event) => setSearchInput(event.target.value)}
             />
           </div>
