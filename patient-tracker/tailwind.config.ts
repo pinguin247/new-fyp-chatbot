@@ -6,6 +6,7 @@ const config = {
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
+    './app/**/_components/**/*.{ts,tsx}', // Include _components folder inside app directory
     './src/**/*.{ts,tsx}',
 	],
   prefix: "",

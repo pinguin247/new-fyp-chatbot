@@ -1,7 +1,9 @@
-import React from 'react'
+'use client'
+import React, { useEffect } from 'react'
 import Image from 'next/image';
 import { CircleUserRound, LayoutIcon, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 function SideNav() {
   const menuList=[
@@ -23,6 +25,11 @@ function SideNav() {
       path:'/dashboard/settings'
     }
   ]
+  const path=usePathname();
+  useEffect(() =>{
+    console.log(path)
+  }, [path])
+
   return (
     <div className='border shadow-md h-screen p-3'>
         <Image src={'/images.png'} alt="Logo" width={45} height={45}/>
@@ -30,7 +37,8 @@ function SideNav() {
         {menuList.map((menu,index)=>(
           // eslint-disable-next-line react/jsx-key
           <Link href={menu.path}>
-          <h2 className='flex items-center gap-3 text-md p-4 text-slate-500 hover:bg-primary hover:text-white cursor-pointer rounded-lg my-2'>
+          <h2 className={`flex items-center gap-3 text-md p-4 text-slate-500 hover:bg-primary hover:text-white cursor-pointer rounded-lg my-2
+            ${path==menu.path&&'bg-primary text-white'}`}>
             <menu.icon />
             {menu.name}
           </h2>
