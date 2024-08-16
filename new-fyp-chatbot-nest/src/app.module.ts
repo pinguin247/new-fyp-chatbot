@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ChatController } from './gpt.controller';
-import { ChatService } from './gpt.service';
+import { ChatController } from './modules/gpt/gpt.controller';
+import { ChatService } from './modules/gpt/gpt.service';
+import { AppController } from './modules/app/app.controller';
+import { AppService } from './modules/app/app.service';
+import { FirebaseService } from './modules/firebase/firebase.service';
 
 @Module({
   imports: [],
-  controllers: [ChatController],
-  providers: [ChatService],
+  controllers: [ChatController, AppController],
+  providers: [ChatService, AppService, FirebaseService],
 })
 export class AppModule {}
