@@ -19,6 +19,11 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 
+import { createClient } from '@supabase/supabase-js';
+import { supabaseUrl, supabaseKey } from '../../../configs/SupabaseConfig';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default function SignIn() {
   const navigation = useNavigation();
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -62,26 +67,30 @@ export default function SignIn() {
     });
   }, [navigation]);
 
-  const onSignIn = () => {
+  const onSignIn = async () => {
     if (email === '' || password === '') {
       console.log('Input fields cannot be empty');
       ToastAndroid.show('Please enter all details', ToastAndroid.BOTTOM);
       return;
     }
-    signInWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed in
-        const user = userCredential.user;
-        console.log(user);
-        router.replace('/home');
-      })
-      .catch((error) => {
-        const errorMessage = error.message;
-        console.log(errorMessage);
-        if (errorMessage == 'Firebase: Error (auth/invalid-email).') {
-          ToastAndroid.show('Invalid Credentials', ToastAndroid.LONG);
-        }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        console.log(data.user);
+        router.replace('/home');
+      }
+    } catch (error) {
+      console.error(error);
+      ToastAndroid.show('Invalid Credentials', ToastAndroid.LONG);
+    }
   };
 
   const togglePasswordVisibility = () => {

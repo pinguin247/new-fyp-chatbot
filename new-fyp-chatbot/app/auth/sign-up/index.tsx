@@ -18,6 +18,10 @@ import {
 } from 'firebase/auth';
 import { auth } from '../../../configs/FirebaseConfig';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { createClient } from '@supabase/supabase-js';
+import { supabaseUrl, supabaseKey } from '../../../configs/SupabaseConfig';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -63,26 +67,36 @@ export default function SignUp() {
     });
   }, [navigation]);
 
-  const onCreateAccount = () => {
+  const onCreateAccount = async () => {
     if (email === '' || password === '' || fullName === '') {
       console.log('Input fields cannot be empty');
       ToastAndroid.show('Please enter all details', ToastAndroid.BOTTOM);
       return;
     }
 
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed up
-        const user = userCredential.user;
-        console.log(user);
-        router.replace('/home');
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        console.log(errorMessage, errorCode);
-        // Handle errors here (e.g., show an alert)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName, // Storing the full name in the user's metadata
+          },
+        },
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        console.log(data.user);
+        router.replace('/home');
+      }
+    } catch (error) {
+      console.error('Error creating account:', error.message);
+      ToastAndroid.show('Error creating account', ToastAndroid.LONG);
+    }
   };
 
   const togglePasswordVisibility = () => {

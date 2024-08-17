@@ -1,0 +1,4 @@
+// supabaseConfig.js
+export const supabaseUrl = 'https://mufvyfxxyfxwnoacgjie.supabase.co';
+export const supabaseKey =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11ZnZ5Znh4eWZ4d25vYWNnamllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjM5MDMwMjMsImV4cCI6MjAzOTQ3OTAyM30.Y1BtDDUMN1JIjnDJYREgVqYgTaOQsjePxG40FIhSZBA';
