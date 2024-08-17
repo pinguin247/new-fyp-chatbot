@@ -5,10 +5,17 @@ import { AppController } from './modules/app/app.controller';
 import { AppService } from './modules/app/app.service';
 import { FirebaseService } from './modules/firebase/firebase.service';
 import { ParserService } from './modules/parser/parser.service';
+import { SupabaseService } from './modules/supabase/supabase.service';
 
 @Module({
   imports: [],
   controllers: [ChatController, AppController],
-  providers: [ChatService, AppService, FirebaseService, ParserService],
+  providers: [
+    ChatService,
+    AppService,
+    FirebaseService,
+    ParserService,
+    SupabaseService,
+  ],
 })
 export class AppModule {}
