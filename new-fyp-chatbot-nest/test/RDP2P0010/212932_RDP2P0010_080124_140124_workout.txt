@@ -1,0 +1,2 @@
+userID;startDate;duration;steps;distance;calories;moderate intensity;vigorous intensity;heartrate
+212932;2024-01-08T09:14:46+0800;193;302;0.13;5.0;0;0;[]
