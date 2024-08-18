@@ -15,10 +15,7 @@ import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import { createClient } from '@supabase/supabase-js';
-import { supabaseUrl, supabaseKey } from '../../../configs/SupabaseConfig';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../../../configs/SupabaseConfig';
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -208,7 +205,7 @@ export default function SignUp() {
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Already have an account? </Text>
-        <Link href="auth/sign-in" style={styles.registerLink}>
+        <Link href="/auth/sign-in" style={styles.registerLink}>
           Log in
         </Link>
       </View>

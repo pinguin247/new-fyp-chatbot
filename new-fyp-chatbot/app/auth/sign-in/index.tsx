@@ -11,21 +11,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { auth } from '../../../configs/FirebaseConfig';
 import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
-} from 'firebase/auth';
-
-import { createClient } from '@supabase/supabase-js';
-import { supabaseUrl, supabaseKey } from '../../../configs/SupabaseConfig';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../../../configs/SupabaseConfig';
 
 export default function SignIn() {
   const navigation = useNavigation();
@@ -196,7 +186,7 @@ export default function SignIn() {
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Don't have an account? </Text>
-        <Link href="auth/sign-up" style={styles.registerLink}>
+        <Link href="/auth/sign-up" style={styles.registerLink}>
           Register
         </Link>
       </View>
