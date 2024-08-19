@@ -5,18 +5,24 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export class SupabaseService {
   private supabase: SupabaseClient;
 
-  private supabaseUrl = process.env.SUPABASE_URL;
-  private supabaseKey = process.env.SUPABASE_API_KEY;
-
   constructor() {
-    console.log(`Supabase URL: ${this.supabaseUrl}`);
-    console.log(
-      `Supabase Key: ${this.supabaseKey ? 'Key is set' : 'Key is missing'}`,
-    );
-    this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_API_KEY;
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
-  async getAllUsers() {
+  async insertParsedRecords(records: any[]): Promise<any[]> {
+    const { data, error } = await this.supabase.from('tracker').insert(records);
+
+    if (error) {
+      throw new Error(`Failed to insert records: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async getAllUsers(): Promise<any[]> {
     const { data, error } = await this.supabase.from('users').select('*');
 
     if (error) {
@@ -30,7 +36,7 @@ export class SupabaseService {
     id: string;
     email: string;
     display_name: string;
-  }) {
+  }): Promise<any> {
     const { data, error } = await this.supabase.from('users').insert(user);
 
     if (error) {
@@ -39,4 +45,6 @@ export class SupabaseService {
 
     return data;
   }
+
+  // Add more methods for other CRUD operations as needed
 }
