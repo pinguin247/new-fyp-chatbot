@@ -39,7 +39,7 @@ export default function Login() {
         </Text>
 
         <TouchableOpacity
-          onPress={() => router.push('auth/sign-in')}
+          onPress={() => router.push('/auth/sign-in')}
           style={styles.button}
         >
           <Text

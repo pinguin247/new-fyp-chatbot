@@ -1,8 +1,7 @@
 import { View, Text, Button, StyleSheet, ToastAndroid } from 'react-native';
 import React from 'react';
 import { router } from 'expo-router';
-import { auth } from '../../configs/FirebaseConfig';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { supabase } from '../../configs/SupabaseConfig';
 
 export default function Profile() {
   const handleLogout = async () => {
@@ -18,15 +17,16 @@ export default function Profile() {
 
   async function logout() {
     try {
-      // Sign out from Firebase
-      await auth.signOut();
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
 
-      // Sign out from Google
-      await GoogleSignin.signOut();
+      if (error) {
+        throw error;
+      }
 
       console.log('User signed out successfully');
-    } catch (error) {
-      console.error('Error signing out: ', error);
+    } catch (error: any) {
+      console.error('Error signing out: ', error.message);
     }
   }
 

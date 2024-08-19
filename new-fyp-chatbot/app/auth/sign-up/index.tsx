@@ -12,12 +12,10 @@ import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
-} from 'firebase/auth';
-import { auth } from '../../../configs/FirebaseConfig';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import { supabase } from '../../../configs/SupabaseConfig';
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -36,24 +34,36 @@ export default function SignUp() {
       // Ensure the account chooser appears
       await GoogleSignin.signOut();
 
-      // Check if your device supports Google Play
-      await GoogleSignin.hasPlayServices({
-        showPlayServicesUpdateDialog: true,
-      });
-      // Get the user's ID token
-      const { idToken } = await GoogleSignin.signIn();
-
-      // Create a Google credential with the token
-      const googleCredential = GoogleAuthProvider.credential(idToken);
-
-      // Sign-in the user with the credential
-      const userCredential = await signInWithCredential(auth, googleCredential);
-      const user = userCredential.user;
-      console.log(user);
+      const userInfo = await GoogleSignin.signIn();
+      console.log(JSON.stringify(userInfo, null, 2));
+      if (userInfo.idToken) {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: userInfo.idToken,
+        });
+        console.log(error, data);
+      } else {
+        throw new Error('no ID token present!');
+      }
       router.replace('/home'); // Navigate to home
-    } catch (error) {
-      console.error(error);
-      ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // user cancelled the login flow
+        console.error(error);
+        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // operation (e.g. sign in) is in progress already
+        console.error(error);
+        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        // play services not available or outdated
+        console.error(error);
+        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+      } else {
+        // some other error happened
+        console.error(error);
+        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+      }
     }
   }
 
@@ -63,26 +73,36 @@ export default function SignUp() {
     });
   }, [navigation]);
 
-  const onCreateAccount = () => {
+  const onCreateAccount = async () => {
     if (email === '' || password === '' || fullName === '') {
       console.log('Input fields cannot be empty');
       ToastAndroid.show('Please enter all details', ToastAndroid.BOTTOM);
       return;
     }
 
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed up
-        const user = userCredential.user;
-        console.log(user);
-        router.replace('/home');
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        console.log(errorMessage, errorCode);
-        // Handle errors here (e.g., show an alert)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName, // Storing the full name in the user's metadata
+          },
+        },
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        console.log(data.user);
+        router.replace('/home');
+      }
+    } catch (error: any) {
+      console.error('Error creating account:', error.message);
+      ToastAndroid.show('Error creating account', ToastAndroid.LONG);
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -185,7 +205,7 @@ export default function SignUp() {
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Already have an account? </Text>
-        <Link href="auth/sign-in" style={styles.registerLink}>
+        <Link href="/auth/sign-in" style={styles.registerLink}>
           Log in
         </Link>
       </View>
