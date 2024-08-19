@@ -8,9 +8,7 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchData() {
-      const response = await fetch(
-        "http://localhost:3000/api/data/firestore/users"
-      ); // or 'http://localhost:3000/api/data/firestore/test-collection' directly
+      const response = await fetch("http://localhost:3000/api/data/users");
       const result = await response.json();
       setData(result);
     }
@@ -18,7 +16,7 @@ export default function Home() {
   }, []);
   return (
     <div>
-      <h1>Data from Firestore</h1>
+      <h1>Data from Sup</h1>
       <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
