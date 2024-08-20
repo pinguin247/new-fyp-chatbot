@@ -1,6 +1,6 @@
 import Login from '@/components/Login';
 import { View } from 'react-native';
-import { supabase } from '../configs/SupabaseConfig';
+import { supabase } from '../lib/supabase';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';

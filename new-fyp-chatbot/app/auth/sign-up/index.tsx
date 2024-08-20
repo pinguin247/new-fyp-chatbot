@@ -15,7 +15,7 @@ import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import { supabase } from '../../../configs/SupabaseConfig';
+import { supabase } from '../../../lib/supabase';
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -101,7 +101,10 @@ export default function SignUp() {
       }
     } catch (error: any) {
       console.error('Error creating account:', error.message);
-      ToastAndroid.show('Error creating account', ToastAndroid.LONG);
+      ToastAndroid.show(
+        `Error creating account: ${error.message}`,
+        ToastAndroid.LONG,
+      );
     }
   };
 

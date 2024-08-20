@@ -15,7 +15,7 @@ import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import { supabase } from '../../../configs/SupabaseConfig';
+import { supabase } from '../../../lib/supabase';
 
 export default function SignIn() {
   const navigation = useNavigation();
