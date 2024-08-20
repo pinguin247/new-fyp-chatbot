@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { GiftedChat, IMessage } from 'react-native-gifted-chat';
 import { Image, LogBox } from 'react-native';
-import { fetchResponse } from '@/utils/fetchResponse';
+import { fetchResponse } from '@/lib/fetchResponse';
 
 LogBox.ignoreLogs([
   'Warning: Avatar: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.',
