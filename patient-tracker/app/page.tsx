@@ -16,7 +16,7 @@ export default function Home() {
   }, []);
   return (
     <div>
-      <h1>Data from Sup</h1>
+      <h1>Data from Supabase</h1>
       <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );
