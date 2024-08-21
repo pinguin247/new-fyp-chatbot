@@ -16,7 +16,7 @@ export default function Chatbot() {
     const userId = '168c70af-f4ce-417c-aace-3c42fb7b5c00'; // Replace with the actual user ID
 
     // Declare the starting message
-    const startingMessage = {
+    const startingMessage: IMessage = {
       _id: Math.round(Math.random() * 1000000),
       text: 'Hello! I am your chatbot. How can I help you?',
       createdAt: new Date(),
@@ -30,7 +30,7 @@ export default function Chatbot() {
     const loadChatHistory = async () => {
       const history = await fetchHistory(userId);
 
-      const formattedHistory = history.map((message: any) => ({
+      const formattedHistory: IMessage[] = history.map((message: any) => ({
         _id: message.id, // Assuming 'id' is the unique identifier in your chat history data
         text: message.content,
         createdAt: new Date(message.created_at),
@@ -38,12 +38,24 @@ export default function Chatbot() {
           _id: message.role === 'user' ? 1 : 2, // Map user IDs appropriately
           name: message.role === 'user' ? 'User' : 'Chatbot',
           avatar:
-            message.role === 'user' ? null : 'https://placekitten.com/200/300',
+            message.role === 'user'
+              ? undefined
+              : 'https://placekitten.com/200/300',
         },
       }));
 
       // Sort the history by createdAt in descending order (newest messages first)
-      formattedHistory.sort((a, b) => b.createdAt - a.createdAt);
+      formattedHistory.sort((a, b) => {
+        const dateA =
+          typeof a.createdAt === 'string' || typeof a.createdAt === 'number'
+            ? new Date(a.createdAt)
+            : a.createdAt;
+        const dateB =
+          typeof b.createdAt === 'string' || typeof b.createdAt === 'number'
+            ? new Date(b.createdAt)
+            : b.createdAt;
+        return dateB.getTime() - dateA.getTime();
+      });
 
       // Save the starting message to Supabase
       await saveMessage(userId, startingMessage.text, 'assistant');
@@ -75,7 +87,7 @@ export default function Chatbot() {
     );
 
     // Create bot message object
-    const botMessage = {
+    const botMessage: IMessage = {
       _id: Math.round(Math.random() * 1000000),
       text: botResponse,
       createdAt: new Date(),
@@ -89,7 +101,17 @@ export default function Chatbot() {
     // Append the new messages (user + bot) and sort all messages again by createdAt in descending order
     setMessages((previousMessages) =>
       GiftedChat.append(previousMessages, [botMessage, ...newMessages]).sort(
-        (a, b) => b.createdAt - a.createdAt,
+        (a, b) => {
+          const dateA =
+            typeof a.createdAt === 'string' || typeof a.createdAt === 'number'
+              ? new Date(a.createdAt)
+              : a.createdAt;
+          const dateB =
+            typeof b.createdAt === 'string' || typeof b.createdAt === 'number'
+              ? new Date(b.createdAt)
+              : b.createdAt;
+          return dateB.getTime() - dateA.getTime();
+        },
       ),
     );
   };
