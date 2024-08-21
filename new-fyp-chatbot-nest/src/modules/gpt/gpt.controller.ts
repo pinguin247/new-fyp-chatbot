@@ -21,4 +21,14 @@ export class ChatController {
   async getChatHistory(@Body('userId') userId: string) {
     return this.chatService.fetchChatHistory(userId);
   }
+
+  @Post('saveMessage')
+  async saveMessage(
+    @Body('userId') userId: string,
+    @Body('content') content: string,
+    @Body('role') role: 'user' | 'system' | 'assistant',
+  ) {
+    await this.supabaseService.insertChatHistory(userId, role, content);
+    return { success: true };
+  }
 }
