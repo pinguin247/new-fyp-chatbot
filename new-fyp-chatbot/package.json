@@ -9,9 +9,9 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "lint": "eslint \"{app,assets,components,constants,hooks,configs,utils}/**/*.{js,ts,tsx}\"",
-    "lint:fix": "eslint \"{app,assets,components,constants,hooks,configs,utils}/**/*.{js,ts,tsx}\" --fix",
-    "format": "prettier --write \"{app,assets,components,constants,hooks,configs,utils}/**/*.{js,ts,tsx,json,css,md}\""
+    "lint": "eslint \"{app,assets,components,constants,hooks,configs,lib}/**/*.{js,ts,tsx}\"",
+    "lint:fix": "eslint \"{app,assets,components,constants,hooks,configs,lib}/**/*.{js,ts,tsx}\" --fix",
+    "format": "prettier --write \"{app,assets,components,constants,hooks,configs,lib}/**/*.{js,ts,tsx,json,css,md}\""
   },
   "jest": {
     "preset": "jest-expo"

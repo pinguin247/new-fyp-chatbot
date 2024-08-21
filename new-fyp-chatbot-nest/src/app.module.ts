@@ -5,9 +5,14 @@ import { AppController } from './modules/app/app.controller';
 import { AppService } from './modules/app/app.service';
 import { ParserService } from './modules/parser/parser.service';
 import { SupabaseService } from './modules/supabase/supabase.service';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true, // Makes the config available globally
+    }),
+  ],
   controllers: [ChatController, AppController],
   providers: [ChatService, AppService, ParserService, SupabaseService],
 })
