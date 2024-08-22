@@ -9,16 +9,28 @@ export const fetchHistory = async (userId: string) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
+        credentials: 'include', // Ensure credentials are sent with the request
       },
     );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch chat history');
+    if (response.redirected) {
+      console.error('Redirected to:', response.url);
+      throw new Error('Redirection detected, likely due to authentication.');
     }
 
-    const data = await response.json();
-    return data; // Return the fetched chat history
+    // Check the response status before trying to read the body
+    if (!response.ok) {
+      throw new Error('Failed to fetch chat history');
+    }
+
+    // Store the response text for logging and JSON parsing
+    const responseText = await response.text();
+    console.log('Raw Response:', responseText);
+
+    // Now parse the stored text as JSON
+    const data = JSON.parse(responseText);
+
+    return data;
   } catch (error) {
     console.error('Error fetching chat history:', error);
     return []; // Return an empty array on error
