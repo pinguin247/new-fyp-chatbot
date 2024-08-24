@@ -42,6 +42,13 @@ export class ChatService {
       role: 'system',
       content: `Let's start with ${exercise.name}. ${exercise.description}`,
     });
+
+    // Set the current exercise in user session
+    const userSession = this.mapService.getSession(userId);
+    if (userSession) {
+      userSession.currentExercise = exercise.name;
+      userSession.failedPersuasionCount = 0; // Initialize failed persuasion count
+    }
   }
 
   async chatWithGPT(userId: string, content: string) {
@@ -51,6 +58,16 @@ export class ChatService {
     if (!this.mapService.getSession(userId)) {
       console.log('No existing session found. Creating a new session...');
       await this.createNewSession(userId);
+    }
+
+    const userSession = this.mapService.getSession(userId);
+
+    // Ensure userSession is not null before proceeding
+    if (!userSession) {
+      console.error(
+        'User session is null after attempting to create or load a session.',
+      );
+      return { response: 'An error occurred. Please try again later.' };
     }
 
     // Save user message to Supabase
@@ -82,45 +99,76 @@ export class ChatService {
       return { response: confirmationMessage };
     }
 
-    // Run persuasion strategy only if the initial response is negative or user has not agreed yet
-    const userSession = this.mapService.getSession(userId);
-    if (userSession && userSession.persuasionAttempt === 0) {
-      console.log('User did not agree. Running persuasion strategy...'); // Log persuasion start
+    // Increment failed persuasion count if the user's response is negative
+    userSession.failedPersuasionCount++;
+    console.log('Failed persuasion count:', userSession.failedPersuasionCount);
+    userSession.persuasionAttempt++;
+    console.log('Persuasion Attempt:', userSession.persuasionAttempt);
 
-      // Decide the persuasion route and strategy using MapService
-      const route = this.mapService.decidePersuasionRoute(userId, content);
-      const strategy = this.mapService.getCurrentStrategy(userId);
-      console.log(`Selected persuasion route: ${route}`); // Log the persuasion route
-      console.log(`Using persuasion strategy: ${strategy}`); // Log the specific strategy
-
-      const prompt = this.generatePrompt(route, userId);
-
-      // Get response from ChatGPT
-      const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant' },
-          ...this.conversationHistory,
-          { role: 'user', content: prompt }, // Add prompt for ChatGPT
-        ],
+    // Check if it's time to switch exercises or give up
+    if (userSession.persuasionAttempt === 3) {
+      // Suggest a new exercise
+      const newExercise = await this.supabaseService.fetchRandomExercise();
+      userSession.currentExercise = newExercise.name;
+      userSession.failedPersuasionCount = 0; // Reset for the new exercise
+      const newExerciseMessage = `What about trying ${newExercise.name}? ${newExercise.description}`;
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: newExerciseMessage,
       });
-
-      const botMessage = chatCompletion.choices[0].message.content;
-
-      // Save assistant (bot) message to Supabase and in-memory history
-      this.conversationHistory.push({ role: 'assistant', content: botMessage });
       await this.supabaseService.insertChatHistory(
         userId,
         'assistant',
-        botMessage,
+        newExerciseMessage,
       );
-
-      return { response: botMessage };
+      return { response: newExerciseMessage };
+    } else if (userSession.persuasionAttempt >= 6) {
+      // Give up after 6 attempts
+      const giveUpMessage =
+        "Alright, it seems you're not interested right now. Let's talk later!";
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: giveUpMessage,
+      });
+      await this.supabaseService.insertChatHistory(
+        userId,
+        'assistant',
+        giveUpMessage,
+      );
+      console.log('Giving up after 6 failed attempts.'); // Log give-up action
+      return { response: giveUpMessage };
     }
 
-    // If the user has agreed, don't run the persuasion model again
-    console.log('User has already agreed. No need to run persuasion again.'); // Log stopping of persuasion
-    return { response: 'Thank you for your response!' };
+    // Run persuasion strategy if less than 6 failed attempts
+    console.log('User did not agree. Running persuasion strategy...'); // Log persuasion start
+    const route = this.mapService.decidePersuasionRoute(userId, content);
+    const strategy = this.mapService.getCurrentStrategy(userId);
+    console.log(`Selected persuasion route: ${route}`); // Log the persuasion route
+    console.log(`Using persuasion strategy: ${strategy}`); // Log the specific strategy
+
+    const prompt = this.generatePrompt(route, userId);
+
+    // Get response from ChatGPT
+    const chatCompletion = await this.openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant' },
+        ...this.conversationHistory,
+        { role: 'user', content: prompt }, // Add prompt for ChatGPT
+      ],
+    });
+
+    const botMessage = chatCompletion.choices[0].message.content;
+
+    // Save assistant (bot) message to Supabase and in-memory history
+    this.conversationHistory.push({ role: 'assistant', content: botMessage });
+    await this.supabaseService.insertChatHistory(
+      userId,
+      'assistant',
+      botMessage,
+    );
+
+    return { response: botMessage };
   }
 
   async fetchChatHistory(userId: string) {

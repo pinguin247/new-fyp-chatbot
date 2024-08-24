@@ -10,6 +10,8 @@ interface UserSession {
   selectedStrategies: { central: number[]; peripheral: number[] };
   strategyIndexChosen: number;
   persuasionAttempt: number;
+  currentExercise: string; // Track the current exercise
+  failedPersuasionCount: number; // Track the number of failed attempts for the current exercise
 }
 
 @Injectable()
@@ -33,6 +35,8 @@ export class MapService {
       },
       strategyIndexChosen: 0,
       persuasionAttempt: 0,
+      currentExercise: '', // Initialize empty exercise
+      failedPersuasionCount: 0, // Initialize failed attempts count
     };
 
     // Store session in Supabase
@@ -45,6 +49,8 @@ export class MapService {
         selected_strategies: this.users[sessionID].selectedStrategies,
         strategy_index_chosen: 0,
         persuasion_attempt: 0,
+        current_exercise: '',
+        failed_persuasion_count: 0,
       });
     } catch (error) {
       console.error('Error creating session in Supabase:', error);
@@ -68,6 +74,8 @@ export class MapService {
           selectedStrategies: data.selected_strategies,
           strategyIndexChosen: data.strategy_index_chosen || 0,
           persuasionAttempt: data.persuasion_attempt || 0,
+          currentExercise: data.current_exercise || '',
+          failedPersuasionCount: data.failed_persuasion_count || 0,
         };
         return this.users[sessionID];
       }
@@ -103,13 +111,16 @@ export class MapService {
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
 
-    const maxWeightIndex = strategyWeights.indexOf(
-      Math.max(...strategyWeights),
-    );
-    userSession.strategyIndexChosen = maxWeightIndex;
+    // Use randomness to diversify strategy selection
+    const maxWeight = Math.max(...strategyWeights);
+    const candidates = strategyWeights
+      .map((weight, index) => (weight === maxWeight ? index : -1))
+      .filter((index) => index !== -1);
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    userSession.strategyIndexChosen = candidates[randomIndex];
 
     // Update eligibility
-    selectedStrategies[maxWeightIndex] = 0;
+    selectedStrategies[userSession.strategyIndexChosen] = 0;
 
     return isCentralRoute ? 'central' : 'peripheral';
   }
@@ -140,16 +151,16 @@ export class MapService {
 
     const index = userSession.strategyIndexChosen;
     strategyWeights[index] = successful
-      ? strategyWeights[index] + 0.1 * (1 - strategyWeights[index])
-      : strategyWeights[index] * 0.9;
+      ? strategyWeights[index] + 0.15 * (1 - strategyWeights[index])
+      : strategyWeights[index] * 0.85;
 
     // Adjust route activation values
     if (successful) {
-      userSession.y_c += 0.2;
-      userSession.y_p -= 0.2;
+      userSession.y_c += 0.3;
+      userSession.y_p -= 0.3;
     } else {
-      userSession.y_c -= 0.1;
-      userSession.y_p += 0.1;
+      userSession.y_c -= 0.2;
+      userSession.y_p += 0.2;
     }
 
     // Update session data in Supabase
@@ -161,9 +172,23 @@ export class MapService {
         selected_strategies: userSession.selectedStrategies,
         strategy_index_chosen: userSession.strategyIndexChosen,
         persuasion_attempt: userSession.persuasionAttempt,
+        current_exercise: userSession.currentExercise,
+        failed_persuasion_count: userSession.failedPersuasionCount,
       });
     } catch (error) {
       console.error('Error updating session in Supabase:', error);
     }
+  }
+
+  incrementFailedPersuasionCount(sessionID: string) {
+    const userSession = this.users[sessionID];
+    userSession.failedPersuasionCount++;
+    userSession.persuasionAttempt++;
+
+    // Update the session data in Supabase
+    this.supabaseService.updateSessionData(sessionID, {
+      failed_persuasion_count: userSession.failedPersuasionCount,
+      persuasion_attempt: userSession.persuasionAttempt,
+    });
   }
 }
