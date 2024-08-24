@@ -17,6 +17,10 @@ export class SupabaseService {
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
+  getClient() {
+    return this.supabase;
+  }
+
   async getProfileIdByName(
     fullName: string,
   ): Promise<{ id: string | null; error?: string }> {
@@ -134,6 +138,79 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error fetching chat history:', error.message);
       throw error; // Re-throw the error to be caught in the controller
+    }
+  }
+
+  async insertSessionData(sessionData: any) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_sessions')
+        .insert([sessionData]);
+
+      if (error) {
+        throw new Error(`Error inserting session data: ${error.message}`);
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Insert session data failed:', err.message);
+      throw err;
+    }
+  }
+
+  async fetchSessionData(sessionId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .single();
+
+      if (error) {
+        throw new Error(`Error fetching session data: ${error.message}`);
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Fetch session data failed:', err.message);
+      throw err;
+    }
+  }
+
+  async updateSessionData(sessionId: string, sessionData: any) {
+    try {
+      const { error } = await this.supabase
+        .from('user_sessions')
+        .update(sessionData)
+        .eq('session_id', sessionId);
+
+      if (error) {
+        throw new Error(`Error updating session data: ${error.message}`);
+      }
+    } catch (err) {
+      console.error('Update session data failed:', err.message);
+      throw err;
+    }
+  }
+
+  async fetchRandomExercise() {
+    try {
+      const { data, error } = await this.supabase.from('exercises').select('*');
+
+      if (error) {
+        throw new Error(`Error fetching exercise: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No exercises found.');
+      }
+
+      // Randomly select an exercise in JavaScript
+      const randomIndex = Math.floor(Math.random() * data.length);
+      return data[randomIndex];
+    } catch (error) {
+      console.error('Fetch random exercise failed:', error.message);
+      throw error;
     }
   }
 }
