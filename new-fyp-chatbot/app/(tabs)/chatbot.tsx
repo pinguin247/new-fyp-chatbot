@@ -3,6 +3,7 @@ import { GiftedChat, IMessage } from 'react-native-gifted-chat';
 import { Image, LogBox } from 'react-native';
 import { fetchResponse } from '@/lib/fetchResponse';
 import { fetchHistory } from '@/lib/fetchHistory';
+import { fetchRandomExercise } from '@/lib/fetchRandomExercise';
 import { saveMessage } from '@/lib/saveMessage';
 import { supabase } from '@/lib/supabase';
 
@@ -27,6 +28,7 @@ export default function Chatbot() {
         console.error('Error fetching user:', error);
       } else if (user) {
         setUserId(user.id); // Set the user ID in state
+        console.log('User ID fetched from Supabase:', user.id); // Add this log to verify userId
       }
     };
 
@@ -80,10 +82,37 @@ export default function Chatbot() {
 
       // Add the starting message to the existing history, and ensure the order is correct
       setMessages([startingMessage, ...formattedHistory]);
+
+      // After sending the default message, recommend an exercise
+      await recommendExercise(userId);
     };
 
     loadChatHistory();
   }, [userId]);
+
+  const recommendExercise = async (userId: string) => {
+    try {
+      const exercise = await fetchRandomExercise();
+
+      const exerciseMessage: IMessage = {
+        _id: Math.round(Math.random() * 1000000),
+        text: `I recommend trying this exercise: ${exercise.name}. ${exercise.description}`,
+        createdAt: new Date(),
+        user: {
+          _id: 2,
+          name: 'Chatbot',
+          avatar: 'https://placekitten.com/200/300',
+        },
+      };
+
+      await saveMessage(userId, exerciseMessage.text, 'assistant');
+      setMessages((previousMessages) =>
+        GiftedChat.append(previousMessages, [exerciseMessage]),
+      );
+    } catch (error) {
+      console.error('Failed to fetch exercise:', error);
+    }
+  };
 
   const handleSend = async (newMessages: IMessage[] = []) => {
     if (!userId) return; // If user ID is not loaded, do nothing
@@ -113,8 +142,8 @@ export default function Chatbot() {
     // Save the user's message to Supabase
     await saveMessage(userId, userMessage, 'user');
 
-    // Asynchronously fetch the bot's response
-    const botResponse = await fetchResponse(userMessage);
+    // Asynchronously fetch the bot's response with userId
+    const botResponse = await fetchResponse(userId, userMessage);
 
     // Save the bot's response to Supabase
     await saveMessage(userId, botResponse, 'assistant');
