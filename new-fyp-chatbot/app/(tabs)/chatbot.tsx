@@ -11,6 +11,7 @@ LogBox.ignoreLogs([
 
 export default function Chatbot() {
   const [messages, setMessages] = useState<IMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const userId = '168c70af-f4ce-417c-aace-3c42fb7b5c00'; // Replace with the actual user ID
@@ -70,6 +71,27 @@ export default function Chatbot() {
   const handleSend = async (newMessages: IMessage[] = []) => {
     const userMessage = newMessages[0].text;
 
+    // Render the user's message immediately
+    setMessages((previousMessages) =>
+      GiftedChat.append(previousMessages, newMessages),
+    );
+
+    // Set loading state and render a "typing" or "loading" indicator
+    setIsLoading(true);
+    const loadingMessage: IMessage = {
+      _id: `loading-${Math.random()}`, // Generate a unique key for the loading message
+      text: '...',
+      createdAt: new Date(),
+      user: {
+        _id: 2,
+        name: 'Chatbot',
+        avatar: 'https://placekitten.com/200/300',
+      },
+    };
+    setMessages((previousMessages) =>
+      GiftedChat.append(previousMessages, [loadingMessage]),
+    );
+
     // Save the user's message to Supabase
     await saveMessage(
       '168c70af-f4ce-417c-aace-3c42fb7b5c00',
@@ -77,6 +99,7 @@ export default function Chatbot() {
       'user',
     );
 
+    // Asynchronously fetch the bot's response
     const botResponse = await fetchResponse(userMessage);
 
     // Save the bot's response to Supabase
@@ -86,9 +109,10 @@ export default function Chatbot() {
       'assistant',
     );
 
-    // Create bot message object
+    // Remove the loading indicator and append the bot's response
+    setIsLoading(false);
     const botMessage: IMessage = {
-      _id: Math.round(Math.random() * 1000000),
+      _id: `bot-${Math.random()}`, // Generate a unique key for the bot message
       text: botResponse,
       createdAt: new Date(),
       user: {
@@ -98,21 +122,16 @@ export default function Chatbot() {
       },
     };
 
-    // Append the new messages (user + bot) and sort all messages again by createdAt in descending order
+    // Remove the loading message and add the bot's response
     setMessages((previousMessages) =>
-      GiftedChat.append(previousMessages, [botMessage, ...newMessages]).sort(
-        (a, b) => {
-          const dateA =
-            typeof a.createdAt === 'string' || typeof a.createdAt === 'number'
-              ? new Date(a.createdAt)
-              : a.createdAt;
-          const dateB =
-            typeof b.createdAt === 'string' || typeof b.createdAt === 'number'
-              ? new Date(b.createdAt)
-              : b.createdAt;
-          return dateB.getTime() - dateA.getTime();
-        },
-      ),
+      GiftedChat.append(
+        previousMessages.filter((msg) => msg.text !== '...'),
+        [botMessage],
+      ).sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      }),
     );
   };
 
@@ -135,6 +154,7 @@ export default function Chatbot() {
       onSend={(newMessages) => handleSend(newMessages)}
       user={{ _id: 1, name: 'User' }}
       renderAvatar={renderAvatar}
+      isTyping={isLoading} // Optional: This prop can be used to show typing indicator in GiftedChat
     />
   );
 }
