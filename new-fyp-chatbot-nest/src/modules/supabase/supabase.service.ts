@@ -17,6 +17,49 @@ export class SupabaseService {
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
+  async getProfileIdByName(
+    fullName: string,
+  ): Promise<{ id: string | null; error?: string }> {
+    try {
+      const { data, error } = await this.supabase
+        .from('profiles')
+        .select('id')
+        .eq('full_name', fullName)
+        .eq('role', 'patient')
+        .limit(2); // Fetch up to 2 rows
+
+      if (error) {
+        console.error('Error fetching profile ID:', error.message);
+        return {
+          id: null,
+          error: 'An error occurred while fetching the profile ID',
+        };
+      }
+
+      if (!data || data.length === 0) {
+        // No matching patient
+        return { id: null, error: 'No patient found with the given name' };
+      }
+
+      if (data.length > 1) {
+        // Multiple matching patients
+        return {
+          id: null,
+          error:
+            'Multiple patients found with the given name. Please specify further.',
+        };
+      }
+
+      return { id: data[0].id };
+    } catch (error) {
+      console.error('Error fetching profile ID:', error.message);
+      return {
+        id: null,
+        error: 'An error occurred while fetching the profile ID',
+      };
+    }
+  }
+
   async insertParsedRecords(records: any[]): Promise<any[]> {
     const { data, error } = await this.supabase.from('tracker').insert(records);
 
@@ -59,6 +102,7 @@ export class SupabaseService {
       }
     } catch (error) {
       console.error('Error inserting chat history:', error.message);
+      throw error; // Re-throw the error to be caught in the controller
     }
   }
 
@@ -89,7 +133,7 @@ export class SupabaseService {
       return data;
     } catch (error) {
       console.error('Error fetching chat history:', error.message);
-      return [];
+      throw error; // Re-throw the error to be caught in the controller
     }
   }
 }

@@ -40,30 +40,57 @@ export default function SignIn() {
 
       const userInfo = await GoogleSignin.signIn();
       if (userInfo.idToken) {
+        // Attempt to sign in with Google ID token
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: userInfo.idToken,
         });
-        console.log(error, data);
+
+        if (error) {
+          if (error.message.includes('already registered')) {
+            // If user is already registered, log them in
+            const { data: signInData, error: signInError } =
+              await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: userInfo.idToken,
+              });
+
+            if (signInError) {
+              console.error(signInError);
+              ToastAndroid.show(
+                'Failed to sign in with Google',
+                ToastAndroid.LONG,
+              );
+            } else {
+              console.log('User logged in:', signInData);
+              router.replace('/home'); // Navigate to home
+            }
+          } else {
+            console.error(error);
+            ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+          }
+        } else {
+          // New user or existing user successfully signed in
+          console.log('User signed in or up:', data);
+          router.replace('/home'); // Navigate to home
+        }
       } else {
-        throw new Error('no ID token present!');
+        throw new Error('No ID token present!');
       }
-      router.replace('/home'); // Navigate to home
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // user cancelled the login flow
         console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        ToastAndroid.show('Google Sign-In cancelled', ToastAndroid.LONG);
       } else if (error.code === statusCodes.IN_PROGRESS) {
-        // operation (e.g. sign in) is in progress already
         console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        ToastAndroid.show('Google Sign-In in progress', ToastAndroid.LONG);
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        // play services not available or outdated
         console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        ToastAndroid.show(
+          'Google Play services not available',
+          ToastAndroid.LONG,
+        );
       } else {
-        // some other error happened
         console.error(error);
         ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
       }
