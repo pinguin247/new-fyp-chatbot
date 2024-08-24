@@ -4,6 +4,7 @@ import { Image, LogBox } from 'react-native';
 import { fetchResponse } from '@/lib/fetchResponse';
 import { fetchHistory } from '@/lib/fetchHistory';
 import { saveMessage } from '@/lib/saveMessage';
+import { supabase } from '@/lib/supabase';
 
 LogBox.ignoreLogs([
   'Warning: Avatar: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.',
@@ -12,9 +13,24 @@ LogBox.ignoreLogs([
 export default function Chatbot() {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const userId = '168c70af-f4ce-417c-aace-3c42fb7b5c00'; // Replace with the actual user ID
+    // Fetch the current user from Supabase
+    const fetchUser = async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error) {
+        console.error('Error fetching user:', error);
+      } else if (user) {
+        setUserId(user.id); // Set the user ID in state
+      }
+    };
+
+    fetchUser();
 
     // Declare the starting message
     const startingMessage: IMessage = {
@@ -29,6 +45,7 @@ export default function Chatbot() {
     };
 
     const loadChatHistory = async () => {
+      if (!userId) return; // If user ID is not yet loaded, do nothing
       const history = await fetchHistory(userId);
 
       const formattedHistory: IMessage[] = history.map((message: any) => ({
@@ -66,9 +83,10 @@ export default function Chatbot() {
     };
 
     loadChatHistory();
-  }, []);
+  }, [userId]);
 
   const handleSend = async (newMessages: IMessage[] = []) => {
+    if (!userId) return; // If user ID is not loaded, do nothing
     const userMessage = newMessages[0].text;
 
     // Render the user's message immediately
@@ -93,21 +111,13 @@ export default function Chatbot() {
     );
 
     // Save the user's message to Supabase
-    await saveMessage(
-      '168c70af-f4ce-417c-aace-3c42fb7b5c00',
-      userMessage,
-      'user',
-    );
+    await saveMessage(userId, userMessage, 'user');
 
     // Asynchronously fetch the bot's response
     const botResponse = await fetchResponse(userMessage);
 
     // Save the bot's response to Supabase
-    await saveMessage(
-      '168c70af-f4ce-417c-aace-3c42fb7b5c00',
-      botResponse,
-      'assistant',
-    );
+    await saveMessage(userId, botResponse, 'assistant');
 
     // Remove the loading indicator and append the bot's response
     setIsLoading(false);
