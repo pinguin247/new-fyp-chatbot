@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class ParserService {
   // Parse the text content of a file buffer into a JSON structure
-  parseTextFileContent(content: string): any[] {
+  parseTextFileContent(content: string, profileID: string): any[] {
     const lines = content.split('\n').filter(Boolean);
 
     // Skip the header if it exists
@@ -36,6 +36,7 @@ export class ParserService {
         moderateIntensity: parseInt(data[6], 10),
         vigorousIntensity: parseInt(data[7], 10),
         heartrate: heartrate,
+        profileID: profileID, // Add profileID to each record
       };
     });
 
