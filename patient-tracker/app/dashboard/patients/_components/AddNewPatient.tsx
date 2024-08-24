@@ -21,6 +21,7 @@ type Inputs = {
 function AddNewPatient() {
   const [open, setOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [patientID, setPatientID] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -31,17 +32,52 @@ function AddNewPatient() {
     setUploadedFiles(files);
   };
 
+  const fetchPatientID = async (fullName: string) => {
+    try {
+      const response = await fetch(
+        `http://${window.location.hostname}:${
+          process.env.NEXT_PUBLIC_API_PORT || 3000
+        }/api/data/get-profile-id`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fullName }),
+        }
+      );
+
+      const { profileId, error } = await response.json();
+      if (!response.ok || error) {
+        toast.error(error || "Failed to fetch patient");
+        return false;
+      }
+      setPatientID(profileId);
+      return true;
+    } catch (error) {
+      console.error("Error fetching patient ID:", error);
+      toast.error("An error occurred while fetching the patient ID.");
+      return false;
+    }
+  };
+
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
-    if (uploadedFiles.length > 0) {
+    const patientIdFetched = await fetchPatientID(data.name); // Fetch the patient ID first
+
+    // If fetching the patient ID failed, exit early
+    if (!patientIdFetched) {
+      return;
+    }
+
+    if (uploadedFiles.length > 0 && patientID) {
       const formData = new FormData();
 
       // Append form fields
       formData.append("name", data.name);
       formData.append("email", data.email);
+      formData.append("profileID", patientID);
 
       // Append uploaded files with the field name 'files'
       uploadedFiles.forEach((file) => {
-        formData.append("files", file); // The key must match the 'FilesInterceptor' field name
+        formData.append("files", file);
       });
 
       try {
@@ -56,12 +92,11 @@ function AddNewPatient() {
         );
 
         if (response.ok) {
-          // Check if the response contains content before trying to parse it
           const result = await response.json();
           toast.success("Files parsed and uploaded successfully.");
           console.log(result);
         } else {
-          const errorText = await response.text(); // Get the text of the error response
+          const errorText = await response.text();
           toast.error(`Failed to parse and upload files: ${errorText}`);
         }
       } catch (error) {
@@ -71,7 +106,7 @@ function AddNewPatient() {
 
       setOpen(false);
     } else {
-      toast.error("Please select files.");
+      toast.error("Please select files or enter a valid patient name.");
     }
   };
 

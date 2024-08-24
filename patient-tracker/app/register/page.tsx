@@ -8,17 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
+import ClipLoader from "react-spinners/ClipLoader"; // Import the spinner
 
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Loading state
 
   const handleRegister = async (event: React.FormEvent) => {
     event.preventDefault(); // Prevent the default form submission behavior
 
     const formData = new FormData(event.currentTarget as HTMLFormElement);
 
+    setIsLoading(true); // Start loading
     const result = await signup(formData);
+    setIsLoading(false); // Stop loading after the signup process is complete
+
     if (result?.error) {
       setError(result.error);
     } else {
@@ -38,55 +43,61 @@ export default function RegisterPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <form className="space-y-8" onSubmit={handleRegister}>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="name" className="text-gray-700 text-lg">
-              Full Name:
-            </Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              required
-              className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your full name"
-            />
+        {isLoading ? ( // Conditionally render the spinner
+          <div className="flex justify-center">
+            <ClipLoader color="#36d7b7" />
           </div>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="email" className="text-gray-700 text-lg">
-              Email:
-            </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your email"
-            />
-          </div>
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="password" className="text-gray-700 text-lg">
-              Password:
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Create a password"
-            />
-          </div>
-          <div className="w-full mt-4">
-            <Button
-              className="w-full py-2 text-white hover:bg-blue-900  rounded-lg transition-all duration-300 ease-in-out"
-              type="submit"
-            >
-              Sign Up
-            </Button>
-          </div>
-        </form>
+        ) : (
+          <form className="space-y-8" onSubmit={handleRegister}>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="name" className="text-gray-700 text-lg">
+                Full Name:
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                required
+                className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="email" className="text-gray-700 text-lg">
+                Email:
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your email"
+              />
+            </div>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="password" className="text-gray-700 text-lg">
+                Password:
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Create a password"
+              />
+            </div>
+            <div className="w-full mt-4">
+              <Button
+                className="w-full py-2 text-white hover:bg-blue-900 rounded-lg transition-all duration-300 ease-in-out"
+                type="submit"
+              >
+                Sign Up
+              </Button>
+            </div>
+          </form>
+        )}
         <div className="text-center">
           <span>Already have an account? Log in </span>
           <Link href="/login">
