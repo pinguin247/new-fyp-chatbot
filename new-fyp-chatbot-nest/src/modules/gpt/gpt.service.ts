@@ -255,6 +255,9 @@ export class ChatService {
       'not interested',
       'maybe later',
       "don't want to",
+      "I don't have time",
+      "I'm too busy",
+      "I don't want to exercise alone",
     ];
     return negativeKeywords.some((keyword) =>
       response.toLowerCase().includes(keyword),
