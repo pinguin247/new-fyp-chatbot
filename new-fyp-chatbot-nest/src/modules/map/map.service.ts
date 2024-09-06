@@ -39,6 +39,8 @@ export class MapService {
       failedPersuasionCount: 0, // Initialize failed attempts count
     };
 
+    console.log(`Created new session for ${sessionID}`, this.users[sessionID]);
+
     // Store session in Supabase
     try {
       await this.supabaseService.insertSessionData({
@@ -77,6 +79,7 @@ export class MapService {
           currentExercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
         };
+        console.log(`Loaded session for ${sessionID}`, this.users[sessionID]);
         return this.users[sessionID];
       }
       return null;
@@ -86,6 +89,28 @@ export class MapService {
     }
   }
 
+  // Helper function to check if a response is negative
+  isNegativeResponse(response: string): boolean {
+    const negativeKeywords = [
+      'no',
+      'not interested',
+      'maybe later',
+      'don’t want to',
+      'I don’t have time',
+      'I’m too busy',
+      'I don’t want to exercise alone',
+      'leave me alone',
+      'not now',
+      'I’m tired',
+    ];
+    const isNegative = negativeKeywords.some((keyword) =>
+      response.toLowerCase().includes(keyword),
+    );
+
+    console.log(`User response is ${isNegative ? 'negative' : 'positive'}`);
+    return isNegative;
+  }
+
   decidePersuasionRoute(
     sessionID: string,
     userResponse: string,
@@ -93,7 +118,7 @@ export class MapService {
     const userSession = this.users[sessionID];
 
     // Check initial motivation level from userResponse
-    if (userResponse.toLowerCase().includes('no')) {
+    if (this.isNegativeResponse(userResponse)) {
       userSession.y_c = 0; // Low motivation
       userSession.y_p = 1;
     } else {
@@ -101,26 +126,55 @@ export class MapService {
       userSession.y_p = 0;
     }
 
-    // Select strategy based on current route
-    const isCentralRoute = userSession.y_c > 0.5;
-    const selectedStrategies = isCentralRoute
-      ? userSession.selectedStrategies.central
-      : userSession.selectedStrategies.peripheral;
+    console.log(
+      `Updated motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+    );
 
-    const strategyWeights = isCentralRoute
+    // Select strategy based on current route using activation vectors
+    const isCentralRoute = userSession.y_c > 0.5;
+    const candidateStrategiesWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
 
-    // Use randomness to diversify strategy selection
-    const maxWeight = Math.max(...strategyWeights);
-    const candidates = strategyWeights
-      .map((weight, index) => (weight === maxWeight ? index : -1))
-      .filter((index) => index !== -1);
-    const randomIndex = Math.floor(Math.random() * candidates.length);
-    userSession.strategyIndexChosen = candidates[randomIndex];
+    const candidateSelectedStrategies = isCentralRoute
+      ? userSession.selectedStrategies.central
+      : userSession.selectedStrategies.peripheral;
+
+    console.log(`Candidate strategy weights:`, candidateStrategiesWeights);
+    console.log(`Candidate selected strategies:`, candidateSelectedStrategies);
+
+    // Calculate activation vectors
+    const activationVectors: number[] = [];
+    for (let i = 0; i < candidateStrategiesWeights.length; i++) {
+      activationVectors[i] =
+        candidateStrategiesWeights[i] *
+        Math.max(userSession.y_c, userSession.y_p) *
+        candidateSelectedStrategies[i];
+    }
+
+    console.log(`Activation vectors:`, activationVectors);
+
+    // Select strategy based on maximum activation vector
+    const maxActivationVector = Math.max(...activationVectors);
+    userSession.strategyIndexChosen = activationVectors.findIndex(
+      (value) => value === maxActivationVector,
+    );
+
+    console.log(
+      `Chosen strategy index: ${userSession.strategyIndexChosen}, Max activation vector: ${maxActivationVector}`,
+    );
 
     // Update eligibility
-    selectedStrategies[userSession.strategyIndexChosen] = 0;
+    candidateSelectedStrategies[userSession.strategyIndexChosen] = 0;
+
+    // Adjust strategyIndexChosen if peripheral route is selected
+    if (!isCentralRoute) {
+      userSession.strategyIndexChosen += 5; // peripheral strategies are indexed after central ones
+    }
+
+    console.log(
+      `Final chosen strategy index: ${userSession.strategyIndexChosen}`,
+    );
 
     return isCentralRoute ? 'central' : 'peripheral';
   }
@@ -139,7 +193,10 @@ export class MapService {
           'Scarcity',
         ];
 
-    return strategies[userSession.strategyIndexChosen];
+    const chosenStrategy =
+      strategies[userSession.strategyIndexChosen % strategies.length];
+    console.log(`Chosen strategy for session ${sessionID}: ${chosenStrategy}`);
+    return chosenStrategy;
   }
 
   async updateStrategyWeights(sessionID: string, successful: boolean) {
@@ -149,10 +206,15 @@ export class MapService {
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
 
-    const index = userSession.strategyIndexChosen;
+    const index = userSession.strategyIndexChosen % strategyWeights.length;
+    const oldWeight = strategyWeights[index];
     strategyWeights[index] = successful
       ? strategyWeights[index] + 0.15 * (1 - strategyWeights[index])
       : strategyWeights[index] * 0.85;
+
+    console.log(
+      `Updated strategy weight for index ${index} from ${oldWeight} to ${strategyWeights[index]}`,
+    );
 
     // Adjust route activation values
     if (successful) {
@@ -162,6 +224,10 @@ export class MapService {
       userSession.y_c -= 0.2;
       userSession.y_p += 0.2;
     }
+
+    console.log(
+      `Updated route activation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+    );
 
     // Update session data in Supabase
     try {
@@ -184,6 +250,13 @@ export class MapService {
     const userSession = this.users[sessionID];
     userSession.failedPersuasionCount++;
     userSession.persuasionAttempt++;
+
+    console.log(
+      `Incremented failed persuasion count: ${userSession.failedPersuasionCount}`,
+    );
+    console.log(
+      `Incremented persuasion attempt count: ${userSession.persuasionAttempt}`,
+    );
 
     // Update the session data in Supabase
     this.supabaseService.updateSessionData(sessionID, {

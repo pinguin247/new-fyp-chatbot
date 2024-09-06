@@ -199,16 +199,23 @@ export class ChatService {
       ? lastExercise.content.split("Let's start with ")[1]
       : 'an exercise';
 
+    // Find the user's last response to provide context to GPT
+    const lastUserResponse =
+      this.conversationHistory.reverse().find((msg) => msg.role === 'user')
+        ?.content || '';
+
     let prompt = '';
 
     if (route === 'central') {
-      prompt = `Explain the health benefits of ${exerciseInfo}. Strategy: ${strategy}`;
+      // Include user's last response for context in the central route
+      prompt = `The user responded with: "${lastUserResponse}". Now explain the health benefits of ${exerciseInfo}. Strategy: ${strategy}`;
     } else {
-      prompt = `Encourage the user to do ${exerciseInfo} in a friendly tone. Strategy: ${strategy}`;
+      // Include user's last response for context in the peripheral route
+      prompt = `The user responded with: "${lastUserResponse}". Encourage the user to do ${exerciseInfo} in a friendly tone. Strategy: ${strategy}`;
     }
 
     // Print out the generated prompt for debugging
-    console.log('Generated Prompt:', prompt);
+    console.log('Generated Prompt with User Response:', prompt);
 
     return prompt;
   }
