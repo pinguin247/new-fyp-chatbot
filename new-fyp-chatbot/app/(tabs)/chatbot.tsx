@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GiftedChat, IMessage } from 'react-native-gifted-chat';
 import { Image, LogBox } from 'react-native';
 import { fetchResponse } from '@/lib/fetchResponse';
 import { fetchHistory } from '@/lib/fetchHistory';
 import { fetchRandomExercise } from '@/lib/fetchRandomExercise';
-import { createSession } from '@/lib/createSession'; // Import API function
+import { createSession } from '@/lib/createSession';
+import { checkExistingSession } from '@/lib/checkExistingSession';
 import { saveMessage } from '@/lib/saveMessage';
+import { updateSession } from '@/lib/updateSession'; // Import updateSession
 import { supabase } from '@/lib/supabase';
 
 LogBox.ignoreLogs([
@@ -16,6 +18,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const isFirstLoad = useRef(true); // Track if it's the first page load
 
   // Fetch the current user from Supabase
   useEffect(() => {
@@ -49,8 +52,8 @@ export default function Chatbot() {
 
     const loadChatHistory = async () => {
       if (!userId) return; // If user ID is not yet loaded, do nothing
-      const history = await fetchHistory(userId);
 
+      const history = await fetchHistory(userId);
       const formattedHistory: IMessage[] = history.map((message: any) => ({
         _id: message.id, // Assuming 'id' is the unique identifier in your chat history data
         text: message.content,
@@ -71,24 +74,61 @@ export default function Chatbot() {
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
 
-      // Save the starting message to Supabase
-      await saveMessage(userId, startingMessage.text, 'assistant');
+      // Always send the two messages when the page first loads
+      if (isFirstLoad.current) {
+        await saveMessage(userId, startingMessage.text, 'assistant');
+        setMessages([startingMessage, ...formattedHistory]);
 
-      // Add the starting message to the existing history
-      setMessages([startingMessage, ...formattedHistory]);
+        // Always recommend an exercise when the page first loads
+        await recommendExercise(userId);
 
-      // After sending the default message, recommend an exercise
-      await recommendExercise(userId);
+        isFirstLoad.current = false; // Set flag to false after first load
+      } else {
+        // If not the first load, just load the chat history without extra messages
+        setMessages(formattedHistory);
+      }
     };
 
     loadChatHistory();
   }, [userId]);
 
-  // Function to recommend an exercise and create a new session
+  // Function to recommend an exercise, reset persuasion_attempt, and create/update session as needed
   const recommendExercise = async (userId: string) => {
     try {
       const exercise = await fetchRandomExercise();
+      const sessionExists = await checkExistingSession(userId);
 
+      if (!sessionExists) {
+        // If no session exists, create a new session and reset persuasion_attempt
+        console.log('No session found, creating a new session.');
+        const response = await createSession(userId, exercise.id);
+
+        if (response.success) {
+          console.log(
+            `Session created successfully with exerciseId: ${exercise.id}`,
+          );
+        } else {
+          console.error('Failed to create session:', response.message);
+        }
+      } else {
+        // If session exists, update it and reset persuasion_attempt
+        console.log(
+          'Session already exists, updating the session and resetting persuasion_attempt.',
+        );
+        const response = await updateSession(userId, exercise.id, {
+          persuasion_attempt: 0, // Reset persuasion_attempt
+        });
+
+        if (response.success) {
+          console.log(
+            `Session updated successfully with exerciseId: ${exercise.id} and persuasion_attempt reset.`,
+          );
+        } else {
+          console.error('Failed to update session:', response.message);
+        }
+      }
+
+      // Always recommend an exercise
       const exerciseMessage: IMessage = {
         _id: Math.round(Math.random() * 1000000),
         text: `I recommend trying this exercise: ${exercise.name}. ${exercise.description}`,
@@ -100,18 +140,8 @@ export default function Chatbot() {
         },
       };
 
+      // Save the exercise recommendation to the chat history
       await saveMessage(userId, exerciseMessage.text, 'assistant');
-
-      // Pass exerciseId to the createSession API instead of exerciseName
-      const response = await createSession(userId, exercise.id); // Send exercise.id instead of exercise.name
-
-      if (response.success) {
-        console.log(
-          `Session created successfully with exerciseId: ${exercise.id}`,
-        );
-      } else {
-        console.error('Failed to create session:', response.message);
-      }
 
       // Append the exercise message to the chat
       setMessages((previousMessages) =>
@@ -132,10 +162,10 @@ export default function Chatbot() {
       GiftedChat.append(previousMessages, newMessages),
     );
 
-    // Set loading state to show a typing indicator
+    // Show a typing indicator
     setIsLoading(true);
     const loadingMessage: IMessage = {
-      _id: `loading-${Math.random()}`, // Generate a unique key for the loading message
+      _id: `loading-${Math.random()}`,
       text: '...',
       createdAt: new Date(),
       user: {
@@ -160,7 +190,7 @@ export default function Chatbot() {
     // Remove the loading indicator and append the bot's response
     setIsLoading(false);
     const botMessage: IMessage = {
-      _id: `bot-${Math.random()}`, // Generate a unique key for the bot message
+      _id: `bot-${Math.random()}`,
       text: botResponse,
       createdAt: new Date(),
       user: {
@@ -170,16 +200,11 @@ export default function Chatbot() {
       },
     };
 
-    // Remove the loading message and append the bot's response
     setMessages((previousMessages) =>
       GiftedChat.append(
         previousMessages.filter((msg) => msg.text !== '...'),
         [botMessage],
-      ).sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime();
-        const dateB = new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      }),
+      ),
     );
   };
 
