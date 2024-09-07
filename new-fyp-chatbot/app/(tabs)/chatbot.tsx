@@ -4,6 +4,7 @@ import { Image, LogBox } from 'react-native';
 import { fetchResponse } from '@/lib/fetchResponse';
 import { fetchHistory } from '@/lib/fetchHistory';
 import { fetchRandomExercise } from '@/lib/fetchRandomExercise';
+import { createSession } from '@/lib/createSession'; // Import API function
 import { saveMessage } from '@/lib/saveMessage';
 import { supabase } from '@/lib/supabase';
 
@@ -16,8 +17,8 @@ export default function Chatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Fetch the current user from Supabase
   useEffect(() => {
-    // Fetch the current user from Supabase
     const fetchUser = async () => {
       const {
         data: { user },
@@ -28,7 +29,7 @@ export default function Chatbot() {
         console.error('Error fetching user:', error);
       } else if (user) {
         setUserId(user.id); // Set the user ID in state
-        console.log('User ID fetched from Supabase:', user.id); // Add this log to verify userId
+        console.log('User ID fetched from Supabase:', user.id);
       }
     };
 
@@ -55,7 +56,7 @@ export default function Chatbot() {
         text: message.content,
         createdAt: new Date(message.created_at),
         user: {
-          _id: message.role === 'user' ? 1 : 2, // Map user IDs appropriately
+          _id: message.role === 'user' ? 1 : 2,
           name: message.role === 'user' ? 'User' : 'Chatbot',
           avatar:
             message.role === 'user'
@@ -64,23 +65,16 @@ export default function Chatbot() {
         },
       }));
 
-      // Sort the history by createdAt in descending order (newest messages first)
-      formattedHistory.sort((a, b) => {
-        const dateA =
-          typeof a.createdAt === 'string' || typeof a.createdAt === 'number'
-            ? new Date(a.createdAt)
-            : a.createdAt;
-        const dateB =
-          typeof b.createdAt === 'string' || typeof b.createdAt === 'number'
-            ? new Date(b.createdAt)
-            : b.createdAt;
-        return dateB.getTime() - dateA.getTime();
-      });
+      // Sort the history by createdAt in descending order
+      formattedHistory.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
 
       // Save the starting message to Supabase
       await saveMessage(userId, startingMessage.text, 'assistant');
 
-      // Add the starting message to the existing history, and ensure the order is correct
+      // Add the starting message to the existing history
       setMessages([startingMessage, ...formattedHistory]);
 
       // After sending the default message, recommend an exercise
@@ -90,6 +84,7 @@ export default function Chatbot() {
     loadChatHistory();
   }, [userId]);
 
+  // Function to recommend an exercise and create a new session
   const recommendExercise = async (userId: string) => {
     try {
       const exercise = await fetchRandomExercise();
@@ -106,6 +101,19 @@ export default function Chatbot() {
       };
 
       await saveMessage(userId, exerciseMessage.text, 'assistant');
+
+      // Pass exerciseId to the createSession API instead of exerciseName
+      const response = await createSession(userId, exercise.id); // Send exercise.id instead of exercise.name
+
+      if (response.success) {
+        console.log(
+          `Session created successfully with exerciseId: ${exercise.id}`,
+        );
+      } else {
+        console.error('Failed to create session:', response.message);
+      }
+
+      // Append the exercise message to the chat
       setMessages((previousMessages) =>
         GiftedChat.append(previousMessages, [exerciseMessage]),
       );
@@ -114,16 +122,17 @@ export default function Chatbot() {
     }
   };
 
+  // Handle sending user messages
   const handleSend = async (newMessages: IMessage[] = []) => {
     if (!userId) return; // If user ID is not loaded, do nothing
     const userMessage = newMessages[0].text;
 
-    // Render the user's message immediately
+    // Immediately append the user's message to the chat
     setMessages((previousMessages) =>
       GiftedChat.append(previousMessages, newMessages),
     );
 
-    // Set loading state and render a "typing" or "loading" indicator
+    // Set loading state to show a typing indicator
     setIsLoading(true);
     const loadingMessage: IMessage = {
       _id: `loading-${Math.random()}`, // Generate a unique key for the loading message
@@ -142,7 +151,7 @@ export default function Chatbot() {
     // Save the user's message to Supabase
     await saveMessage(userId, userMessage, 'user');
 
-    // Asynchronously fetch the bot's response with userId
+    // Fetch the bot's response
     const botResponse = await fetchResponse(userId, userMessage);
 
     // Save the bot's response to Supabase
@@ -161,7 +170,7 @@ export default function Chatbot() {
       },
     };
 
-    // Remove the loading message and add the bot's response
+    // Remove the loading message and append the bot's response
     setMessages((previousMessages) =>
       GiftedChat.append(
         previousMessages.filter((msg) => msg.text !== '...'),
@@ -174,8 +183,8 @@ export default function Chatbot() {
     );
   };
 
+  // Render custom avatar for the chatbot
   const renderAvatar = (props: any) => {
-    // Only render avatar for the chatbot
     if (props.currentMessage.user._id === 2) {
       return (
         <Image
@@ -193,7 +202,7 @@ export default function Chatbot() {
       onSend={(newMessages) => handleSend(newMessages)}
       user={{ _id: 1, name: 'User' }}
       renderAvatar={renderAvatar}
-      isTyping={isLoading} // Optional: This prop can be used to show typing indicator in GiftedChat
+      isTyping={isLoading} // Show typing indicator when loading
     />
   );
 }
