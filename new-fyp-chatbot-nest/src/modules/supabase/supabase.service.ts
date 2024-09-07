@@ -179,16 +179,25 @@ export class SupabaseService {
 
   async updateSessionData(sessionId: string, sessionData: any) {
     try {
+      console.log(
+        `Updating session for sessionId: ${sessionId} with data:`,
+        sessionData,
+      );
+
       const { error } = await this.supabase
         .from('user_sessions')
         .update(sessionData)
-        .eq('session_id', sessionId);
+        .eq('user_id', sessionId); // Assuming 'user_id' is used for filtering
 
       if (error) {
-        throw new Error(`Error updating session data: ${error.message}`);
+        console.error(`Error updating session in Supabase: ${error.message}`);
+        return { success: false, message: error.message };
       }
+
+      console.log('Session updated successfully in Supabase.');
+      return { success: true };
     } catch (err) {
-      console.error('Update session data failed:', err.message);
+      console.error('Update session in Supabase failed:', err.message);
       throw err;
     }
   }
@@ -210,6 +219,32 @@ export class SupabaseService {
       return data[randomIndex];
     } catch (error) {
       console.error('Fetch random exercise failed:', error.message);
+      throw error;
+    }
+  }
+
+  // Method to fetch an exercise by its ID
+  async getExerciseById(exerciseId: string) {
+    try {
+      if (!exerciseId) {
+        throw new Error('Exercise ID is undefined');
+      }
+
+      console.log('Fetching exercise with ID:', exerciseId); // Log the exerciseId for debugging
+
+      const { data, error } = await this.supabase
+        .from('exercises')
+        .select('*')
+        .eq('id', exerciseId)
+        .single();
+
+      if (error) {
+        throw new Error(`Error fetching exercise by id: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Fetch exercise by id failed:', error.message);
       throw error;
     }
   }

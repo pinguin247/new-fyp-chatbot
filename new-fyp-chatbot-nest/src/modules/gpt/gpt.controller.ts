@@ -31,4 +31,19 @@ export class ChatController {
     await this.supabaseService.insertChatHistory(userId, role, content);
     return { success: true };
   }
+
+  // ChatController
+  @Post('createSession')
+  async createSession(
+    @Body('userId') userId: string,
+    @Body('exerciseId') exerciseId: string,
+  ) {
+    try {
+      await this.chatService.createNewSession(userId, exerciseId);
+      return { success: true, message: 'Session created successfully.' };
+    } catch (error) {
+      console.error('Error creating session:', error);
+      return { success: false, message: 'Failed to create session.' };
+    }
+  }
 }

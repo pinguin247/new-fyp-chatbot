@@ -1,4 +1,3 @@
-// src/map.service.ts
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -10,7 +9,7 @@ interface UserSession {
   selectedStrategies: { central: number[]; peripheral: number[] };
   strategyIndexChosen: number;
   persuasionAttempt: number;
-  currentExercise: string; // Track the current exercise
+  current_exercise: string; // Track the current exercise
   failedPersuasionCount: number; // Track the number of failed attempts for the current exercise
 }
 
@@ -20,9 +19,9 @@ export class MapService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async createNewSession(sessionID: string) {
-    this.users[sessionID] = {
-      sessionID,
+  async createNewSession(userId: string, exercise: string) {
+    this.users[userId] = {
+      sessionID: userId,
       y_c: 0,
       y_p: 1,
       strategyWeights: {
@@ -35,23 +34,26 @@ export class MapService {
       },
       strategyIndexChosen: 0,
       persuasionAttempt: 0,
-      currentExercise: '', // Initialize empty exercise
-      failedPersuasionCount: 0, // Initialize failed attempts count
+      current_exercise: exercise,
+      failedPersuasionCount: 0,
     };
 
-    console.log(`Created new session for ${sessionID}`, this.users[sessionID]);
+    console.log(
+      `Created new session for userId: ${userId}`,
+      this.users[userId],
+    );
 
-    // Store session in Supabase
+    // Store session in Supabase with user_id
     try {
       await this.supabaseService.insertSessionData({
-        session_id: sessionID,
+        user_id: userId, // Insert the userId into the user_id field
         y_c: 0,
         y_p: 1,
-        strategy_weights: this.users[sessionID].strategyWeights,
-        selected_strategies: this.users[sessionID].selectedStrategies,
+        strategy_weights: this.users[userId].strategyWeights,
+        selected_strategies: this.users[userId].selectedStrategies,
         strategy_index_chosen: 0,
         persuasion_attempt: 0,
-        current_exercise: '',
+        current_exercise: exercise,
         failed_persuasion_count: 0,
       });
     } catch (error) {
@@ -59,28 +61,28 @@ export class MapService {
     }
   }
 
-  getSession(sessionID: string): UserSession | null {
-    return this.users[sessionID] || null;
+  getSession(userId: string): UserSession | null {
+    return this.users[userId] || null;
   }
 
-  async loadSessionFromSupabase(sessionID: string) {
+  async loadSessionFromSupabase(userId: string) {
     try {
-      const data = await this.supabaseService.fetchSessionData(sessionID);
+      const data = await this.supabaseService.fetchSessionData(userId);
 
       if (data) {
-        this.users[sessionID] = {
-          sessionID: data.session_id,
+        this.users[userId] = {
+          sessionID: data.user_id, // Use user_id here
           y_c: data.y_c,
           y_p: data.y_p,
           strategyWeights: data.strategy_weights,
           selectedStrategies: data.selected_strategies,
           strategyIndexChosen: data.strategy_index_chosen || 0,
           persuasionAttempt: data.persuasion_attempt || 0,
-          currentExercise: data.current_exercise || '',
+          current_exercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
         };
-        console.log(`Loaded session for ${sessionID}`, this.users[sessionID]);
-        return this.users[sessionID];
+        console.log(`Loaded session for userId: ${userId}`, this.users[userId]);
+        return this.users[userId];
       }
       return null;
     } catch (error) {
@@ -89,42 +91,41 @@ export class MapService {
     }
   }
 
-  // Helper function to check if a response is negative
-  isNegativeResponse(response: string): boolean {
-    const negativeKeywords = [
-      'no',
-      'not interested',
-      'maybe later',
-      'don’t want to',
-      'I don’t have time',
-      'I’m too busy',
-      'I don’t want to exercise alone',
-      'leave me alone',
-      'not now',
-      'I’m tired',
-    ];
-    const isNegative = negativeKeywords.some((keyword) =>
-      response.toLowerCase().includes(keyword),
+  async updateCurrentExercise(userId: string, newExercise: string) {
+    const userSession = this.getSession(userId);
+
+    if (!userSession) {
+      console.error('No session found to update exercise');
+      return;
+    }
+
+    userSession.current_exercise = newExercise;
+    userSession.failedPersuasionCount = 0; // Reset failed attempts
+
+    console.log(
+      `Updated current exercise for user ${userId} to ${newExercise}`,
     );
 
-    console.log(`User response is ${isNegative ? 'negative' : 'positive'}`);
-    return isNegative;
+    // Update the current exercise in Supabase
+    try {
+      await this.supabaseService.updateSessionData(userId, {
+        current_exercise: newExercise,
+        failed_persuasion_count: 0, // Reset the failed count in Supabase as well
+      });
+    } catch (error) {
+      console.error('Error updating current exercise in Supabase:', error);
+    }
   }
 
   decidePersuasionRoute(
     sessionID: string,
-    userResponse: string,
+    x_m: number,
   ): 'central' | 'peripheral' {
     const userSession = this.users[sessionID];
 
-    // Check initial motivation level from userResponse
-    if (this.isNegativeResponse(userResponse)) {
-      userSession.y_c = 0; // Low motivation
-      userSession.y_p = 1;
-    } else {
-      userSession.y_c = 1; // High motivation
-      userSession.y_p = 0;
-    }
+    // Use x_m directly to update motivation values
+    userSession.y_c = x_m;
+    userSession.y_p = 1 - x_m;
 
     console.log(
       `Updated motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
@@ -169,7 +170,7 @@ export class MapService {
 
     // Adjust strategyIndexChosen if peripheral route is selected
     if (!isCentralRoute) {
-      userSession.strategyIndexChosen += 5; // peripheral strategies are indexed after central ones
+      userSession.strategyIndexChosen += 5;
     }
 
     console.log(
@@ -238,7 +239,7 @@ export class MapService {
         selected_strategies: userSession.selectedStrategies,
         strategy_index_chosen: userSession.strategyIndexChosen,
         persuasion_attempt: userSession.persuasionAttempt,
-        current_exercise: userSession.currentExercise,
+        current_exercise: userSession.current_exercise,
         failed_persuasion_count: userSession.failedPersuasionCount,
       });
     } catch (error) {
