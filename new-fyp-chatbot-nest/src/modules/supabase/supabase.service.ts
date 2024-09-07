@@ -177,6 +177,28 @@ export class SupabaseService {
     }
   }
 
+  // Fetch session data by userId
+  async fetchSessionDataByUserId(userId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .single(); // Expecting a single session for each user
+
+      if (error) {
+        throw new Error(
+          `Error fetching session data by user_id: ${error.message}`,
+        );
+      }
+
+      return data;
+    } catch (err) {
+      console.error('Fetch session data by user_id failed:', err.message);
+      throw err;
+    }
+  }
+
   async updateSessionData(sessionId: string, sessionData: any) {
     try {
       console.log(

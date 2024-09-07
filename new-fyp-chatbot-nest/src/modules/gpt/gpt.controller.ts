@@ -32,7 +32,6 @@ export class ChatController {
     return { success: true };
   }
 
-  // ChatController
   @Post('createSession')
   async createSession(
     @Body('userId') userId: string,
@@ -44,6 +43,20 @@ export class ChatController {
     } catch (error) {
       console.error('Error creating session:', error);
       return { success: false, message: 'Failed to create session.' };
+    }
+  }
+
+  @Post('updateSession')
+  async updateSession(
+    @Body('userId') userId: string,
+    @Body('exerciseId') exerciseId: string,
+  ) {
+    try {
+      await this.chatService.updateSession(userId, exerciseId);
+      return { success: true, message: 'Session updated successfully.' };
+    } catch (error) {
+      console.error('Error updating session:', error);
+      return { success: false, message: 'Failed to update session.' };
     }
   }
 }

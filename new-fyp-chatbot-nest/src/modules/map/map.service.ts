@@ -19,6 +19,23 @@ export class MapService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  async checkExistingSession(userId: string): Promise<boolean> {
+    try {
+      // Fetch session data from Supabase
+      const data = await this.supabaseService.fetchSessionDataByUserId(userId);
+      if (data) {
+        console.log(`Session found for user: ${userId}`);
+        return true; // Session exists
+      } else {
+        console.log(`No session found for user: ${userId}`);
+        return false; // No session exists
+      }
+    } catch (error) {
+      console.error('Error checking session from Supabase:', error);
+      return false;
+    }
+  }
+
   async createNewSession(userId: string, exercise: string) {
     this.users[userId] = {
       sessionID: userId,

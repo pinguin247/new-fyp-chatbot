@@ -7,7 +7,7 @@ import { MapService } from '../map/map.service'; // Import the MapService
 export class ChatService {
   private openai: OpenAI;
   private conversationHistory: {
-    role: 'user' | 'system' | 'assistant';
+    role: 'user' | 'assistant';
     content: string;
   }[] = [];
 
@@ -37,31 +37,39 @@ export class ChatService {
       throw new Error('Exercise not found');
     }
 
-    // Log the fetched exercise for debugging
     console.log(`Fetched exercise: ${exercise.name}`);
 
     // Delegate session creation logic to MapService
     await this.mapService.createNewSession(userId, exercise.name);
 
-    // Log the exercise for tracking
     console.log(`Created session with exercise: ${exercise.name}`);
+  }
 
-    // Save the recommended exercise in chat history
-    await this.supabaseService.insertChatHistory(
-      userId,
-      'system',
-      `Let's start with ${exercise.name}. ${exercise.description}`,
+  async updateSession(userId: string, exerciseId: string) {
+    console.log(
+      `Updating session for user: ${userId} with exercise ${exerciseId}`,
     );
 
-    // Update the conversation history in memory
-    this.conversationHistory.push({
-      role: 'system',
-      content: `Let's start with ${exercise.name}. ${exercise.description}`,
-    });
+    let exercise;
+    try {
+      exercise = await this.supabaseService.getExerciseById(exerciseId);
+    } catch (error) {
+      console.error(`Exercise with id ${exerciseId} not found`);
+      throw new Error('Exercise not found');
+    }
+
+    if (!exercise) {
+      console.error(`No exercise found with id ${exerciseId}`);
+      throw new Error('Exercise not found');
+    }
+
+    // Update session with new exercise
+    await this.mapService.updateCurrentExercise(userId, exercise.name);
+    console.log(`Updated session with exercise: ${exercise.name}`);
   }
 
   async chatWithGPT(userId: string, content: string) {
-    console.log('Processing chat for user:', userId, 'with message:', content); // Log user message
+    console.log('Processing chat for user:', userId, 'with message:', content);
 
     // Check if user session exists, if not create a new session
     if (!this.mapService.getSession(userId)) {
@@ -72,10 +80,9 @@ export class ChatService {
 
     let userSession = this.mapService.getSession(userId);
 
-    // Ensure userSession is not null before proceeding
     if (!userSession) {
       console.error(
-        'User session is null after attempting to create or load a session.',
+        'User session is null after attempting to create/load a session.',
       );
       return { response: 'An error occurred. Please try again later.' };
     }
@@ -88,13 +95,13 @@ export class ChatService {
       content: content,
     });
 
-    // Determine user motivation based on the response
+    // Determine user motivation
     const x_m = this.determineUserMotivation(content);
-    console.log(`Determined motivation: ${x_m}`); // Log the motivation
+    console.log(`Determined motivation: ${x_m}`);
 
-    // High motivation: user agreed to exercise
+    // If high motivation, proceed
     if (x_m === 1) {
-      console.log('User agreed to exercise. No further persuasion needed.'); // Log user agreement
+      console.log('User agreed to exercise. No further persuasion needed.');
       const confirmationMessage =
         "Great! I'm glad you're willing to try the exercise. Keep it up!";
       this.conversationHistory.push({
@@ -102,7 +109,7 @@ export class ChatService {
         content: confirmationMessage,
       });
 
-      // Save the confirmation message to Supabase
+      // Save confirmation message to Supabase
       await this.supabaseService.insertChatHistory(
         userId,
         'assistant',
@@ -114,70 +121,10 @@ export class ChatService {
 
     // Low motivation: continue persuasion attempts
     console.log('User did not agree. Running persuasion strategy...');
-
-    // Increment failed persuasion count and update session in Supabase
     await this.mapService.incrementFailedPersuasionCount(userId);
-
-    // Fetch the updated session after incrementing the failed persuasion count
     userSession = this.mapService.getSession(userId);
-    console.log(
-      'Failed persuasion count updated:',
-      userSession.failedPersuasionCount,
-    );
 
-    // **Switch exercise after 3 failed attempts** (peripheral route strategy first)
-    if (userSession.persuasionAttempt == 3) {
-      let newExercise;
-      do {
-        newExercise = await this.supabaseService.fetchRandomExercise();
-      } while (newExercise.name === userSession.current_exercise); // Ensure the new exercise is different from the current one
-
-      console.log(`Switching to a new exercise: ${newExercise.name}`);
-
-      // Update session with the new exercise and reset the persuasion count
-      userSession.current_exercise = newExercise.name;
-      userSession.failedPersuasionCount = 0;
-
-      // **Update the current_exercise in Supabase**
-      await this.supabaseService.updateSessionData(userId, {
-        current_exercise: newExercise.name,
-        failed_persuasion_count: 0,
-      });
-
-      const newExerciseMessage = `What about trying ${newExercise.name}? ${newExercise.description}`;
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: newExerciseMessage,
-      });
-
-      // Save new exercise message to Supabase
-      await this.supabaseService.insertChatHistory(
-        userId,
-        'assistant',
-        newExerciseMessage,
-      );
-
-      return { response: newExerciseMessage };
-    } else if (userSession.persuasionAttempt >= 6) {
-      // After 6 total attempts (3 per exercise), give up or use central route strategies
-      const giveUpMessage =
-        "Alright, it seems you're not interested right now. Let's talk later!";
-      this.conversationHistory.push({
-        role: 'assistant',
-        content: giveUpMessage,
-      });
-
-      // Save give-up message to Supabase
-      await this.supabaseService.insertChatHistory(
-        userId,
-        'assistant',
-        giveUpMessage,
-      );
-      console.log('Giving up after 6 failed attempts.');
-      return { response: giveUpMessage };
-    }
-
-    // **Run persuasion strategy if less than 6 failed attempts**
+    // ** Run persuasion strategy first
     const route = this.mapService.decidePersuasionRoute(userId, x_m);
     const strategy = this.mapService.getCurrentStrategy(userId);
     console.log(`Selected persuasion route: ${route}`);
@@ -189,7 +136,7 @@ export class ChatService {
     const chatCompletion = await this.openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'You are a helpful assistant' },
+        { role: 'system', content: 'You are a helpful assistant' }, // Only in memory
         ...this.conversationHistory,
         { role: 'user', content: prompt },
       ],
@@ -197,13 +144,47 @@ export class ChatService {
 
     const botMessage = chatCompletion.choices[0].message.content;
 
-    // Save assistant (bot) message to Supabase and in-memory history
+    // Save assistant (bot) message to Supabase
     this.conversationHistory.push({ role: 'assistant', content: botMessage });
     await this.supabaseService.insertChatHistory(
       userId,
       'assistant',
       botMessage,
     );
+
+    // Check if persuasionAttempt == 3
+    if (userSession.persuasionAttempt == 3) {
+      // Recommend new exercise after running persuasion strategy
+      let newExercise;
+      do {
+        newExercise = await this.supabaseService.fetchRandomExercise();
+      } while (newExercise.name === userSession.current_exercise);
+
+      console.log(`Switching to a new exercise: ${newExercise.name}`);
+      userSession.current_exercise = newExercise.name;
+      userSession.failedPersuasionCount = 0;
+
+      // Update session with new exercise
+      await this.updateSession(userId, newExercise.id);
+
+      return { response: `What about trying ${newExercise.name}?` };
+    } else if (userSession.persuasionAttempt >= 6) {
+      // Give up after 6 failed attempts
+      const giveUpMessage =
+        "Alright, it seems you're not interested right now. Let's talk later!";
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: giveUpMessage,
+      });
+
+      await this.supabaseService.insertChatHistory(
+        userId,
+        'assistant',
+        giveUpMessage,
+      );
+      console.log('Giving up after 6 failed attempts.');
+      return { response: giveUpMessage };
+    }
 
     return { response: botMessage };
   }
@@ -218,7 +199,6 @@ export class ChatService {
       'sounds good',
       "let's do it",
     ];
-
     const negativeKeywords = [
       'no',
       'not interested',
@@ -239,7 +219,7 @@ export class ChatService {
     // Return 1 for high motivation, 0 for low motivation
     if (isPositive) return 1;
     if (isNegative) return 0;
-    return 0.5; // Optional: neutral or unsure motivation level
+    return 0.5; // Neutral motivation level
   }
 
   async fetchChatHistory(userId: string) {
@@ -254,23 +234,18 @@ export class ChatService {
     }));
 
     console.log('Updated in-memory conversation history.');
-
     return history;
   }
 
   generatePrompt(route: 'central' | 'peripheral', userId: string): string {
     const strategy = this.mapService.getCurrentStrategy(userId);
-
-    // Retrieve the current exercise from the user session
     const userSession = this.mapService.getSession(userId);
-    const exerciseInfo = userSession?.current_exercise || 'an exercise'; // Default to 'an exercise' if not found
-
+    const exerciseInfo = userSession?.current_exercise || 'an exercise';
     const lastUserResponse =
       this.conversationHistory.reverse().find((msg) => msg.role === 'user')
         ?.content || '';
 
     let prompt = '';
-
     if (route === 'central') {
       prompt = `The user responded with: "${lastUserResponse}". Now explain the health benefits of ${exerciseInfo}. Strategy: ${strategy}`;
     } else {
@@ -278,7 +253,6 @@ export class ChatService {
     }
 
     console.log('Generated Prompt with User Response:', prompt);
-
     return prompt;
   }
 
@@ -291,11 +265,5 @@ export class ChatService {
     );
 
     await this.mapService.updateStrategyWeights(userId, successful);
-
-    await this.supabaseService.insertChatHistory(
-      userId,
-      'system',
-      'Strategy weights updated',
-    );
   }
 }

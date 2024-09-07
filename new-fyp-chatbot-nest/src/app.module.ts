@@ -4,6 +4,7 @@ import { ChatService } from './modules/gpt/gpt.service';
 import { AppController } from './modules/app/app.controller';
 import { ParserController } from './modules/parser/parser.controller';
 import { ExerciseController } from './modules/exercise/exercise.controller';
+import { MapController } from './modules/map/map.controller';
 import { AppService } from './modules/app/app.service';
 import { ParserService } from './modules/parser/parser.service';
 import { SupabaseService } from './modules/supabase/supabase.service';
@@ -22,6 +23,7 @@ import { ConfigModule } from '@nestjs/config';
     AppController,
     ParserController,
     ExerciseController,
+    MapController,
   ],
   providers: [
     ChatService,
