@@ -184,15 +184,21 @@ export class SupabaseService {
         .from('user_sessions')
         .select('*')
         .eq('user_id', userId)
-        .single(); // Expecting a single session for each user
+        .limit(1); // Fetch only one session, even if multiple exist
 
       if (error) {
-        throw new Error(
+        console.error(
           `Error fetching session data by user_id: ${error.message}`,
         );
+        return null; // Gracefully return null if there's an error
       }
 
-      return data;
+      if (!data || data.length === 0) {
+        console.log(`No session data found for user ${userId}`);
+        return null; // Return null if no session data is found
+      }
+
+      return data[0]; // Return the first session if multiple are found
     } catch (err) {
       console.error('Fetch session data by user_id failed:', err.message);
       throw err;

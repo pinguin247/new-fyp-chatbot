@@ -21,15 +21,13 @@ export class MapService {
 
   async checkExistingSession(userId: string): Promise<boolean> {
     try {
-      // Fetch session data from Supabase
-      const data = await this.supabaseService.fetchSessionDataByUserId(userId);
-      if (data) {
+      const session = await this.loadSessionFromSupabase(userId);
+      if (session) {
         console.log(`Session found for user: ${userId}`);
-        return true; // Session exists
-      } else {
-        console.log(`No session found for user: ${userId}`);
-        return false; // No session exists
+        return true;
       }
+      console.log(`No session found for user: ${userId}`);
+      return false;
     } catch (error) {
       console.error('Error checking session from Supabase:', error);
       return false;
@@ -42,12 +40,12 @@ export class MapService {
       y_c: 0,
       y_p: 1,
       strategyWeights: {
-        central: [0.2, 0.2, 0.2, 0.2, 0.2],
-        peripheral: [0.167, 0.167, 0.167, 0.167, 0.167, 0.167],
+        central: Array(5).fill(0.2), // Simpler way to initialize identical values
+        peripheral: Array(6).fill(0.167),
       },
       selectedStrategies: {
-        central: [1, 1, 1, 1, 1],
-        peripheral: [1, 1, 1, 1, 1, 1],
+        central: Array(5).fill(1),
+        peripheral: Array(6).fill(1),
       },
       strategyIndexChosen: 0,
       persuasionAttempt: 0,
@@ -55,15 +53,11 @@ export class MapService {
       failedPersuasionCount: 0,
     };
 
-    console.log(
-      `Created new session for userId: ${userId}`,
-      this.users[userId],
-    );
+    console.log(`Created new session for userId: ${userId}`);
 
-    // Store session in Supabase with user_id
     try {
       await this.supabaseService.insertSessionData({
-        user_id: userId, // Insert the userId into the user_id field
+        user_id: userId,
         y_c: 0,
         y_p: 1,
         strategy_weights: this.users[userId].strategyWeights,
@@ -83,12 +77,14 @@ export class MapService {
   }
 
   async loadSessionFromSupabase(userId: string) {
+    if (this.users[userId]) return this.users[userId]; // Return from cache if available
+
     try {
-      const data = await this.supabaseService.fetchSessionData(userId);
+      const data = await this.supabaseService.fetchSessionDataByUserId(userId);
 
       if (data) {
         this.users[userId] = {
-          sessionID: data.user_id, // Use user_id here
+          sessionID: data.user_id,
           y_c: data.y_c,
           y_p: data.y_p,
           strategyWeights: data.strategy_weights,
@@ -98,7 +94,7 @@ export class MapService {
           current_exercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
         };
-        console.log(`Loaded session for userId: ${userId}`, this.users[userId]);
+        console.log(`Loaded session for userId: ${userId}`);
         return this.users[userId];
       }
       return null;
@@ -109,15 +105,26 @@ export class MapService {
   }
 
   async updateCurrentExercise(userId: string, newExercise: string) {
-    const userSession = this.getSession(userId);
+    let userSession = this.getSession(userId);
 
+    // If session does not exist in memory, load it from Supabase
     if (!userSession) {
-      console.error('No session found to update exercise');
-      return;
+      console.log(
+        `Session not found in memory for user: ${userId}, fetching from Supabase...`,
+      );
+      userSession = await this.loadSessionFromSupabase(userId);
+
+      if (!userSession) {
+        console.error(
+          'No session found to update exercise, neither in memory nor in Supabase',
+        );
+        return;
+      }
     }
 
+    // Update current exercise and reset failed persuasion count
     userSession.current_exercise = newExercise;
-    userSession.failedPersuasionCount = 0; // Reset failed attempts
+    userSession.failedPersuasionCount = 0;
 
     console.log(
       `Updated current exercise for user ${userId} to ${newExercise}`,
@@ -140,7 +147,7 @@ export class MapService {
   ): 'central' | 'peripheral' {
     const userSession = this.users[sessionID];
 
-    // Use x_m directly to update motivation values
+    // Update motivation levels
     userSession.y_c = x_m;
     userSession.y_p = 1 - x_m;
 
@@ -148,51 +155,33 @@ export class MapService {
       `Updated motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    // Select strategy based on current route using activation vectors
     const isCentralRoute = userSession.y_c > 0.5;
     const candidateStrategiesWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
-
     const candidateSelectedStrategies = isCentralRoute
       ? userSession.selectedStrategies.central
       : userSession.selectedStrategies.peripheral;
 
-    console.log(`Candidate strategy weights:`, candidateStrategiesWeights);
-    console.log(`Candidate selected strategies:`, candidateSelectedStrategies);
-
     // Calculate activation vectors
-    const activationVectors: number[] = [];
-    for (let i = 0; i < candidateStrategiesWeights.length; i++) {
-      activationVectors[i] =
-        candidateStrategiesWeights[i] *
+    const activationVectors: number[] = candidateStrategiesWeights.map(
+      (weight, i) =>
+        weight *
         Math.max(userSession.y_c, userSession.y_p) *
-        candidateSelectedStrategies[i];
-    }
-
-    console.log(`Activation vectors:`, activationVectors);
+        candidateSelectedStrategies[i],
+    );
 
     // Select strategy based on maximum activation vector
     const maxActivationVector = Math.max(...activationVectors);
-    userSession.strategyIndexChosen = activationVectors.findIndex(
-      (value) => value === maxActivationVector,
-    );
+    userSession.strategyIndexChosen =
+      activationVectors.indexOf(maxActivationVector);
 
     console.log(
       `Chosen strategy index: ${userSession.strategyIndexChosen}, Max activation vector: ${maxActivationVector}`,
     );
 
-    // Update eligibility
-    candidateSelectedStrategies[userSession.strategyIndexChosen] = 0;
-
-    // Adjust strategyIndexChosen if peripheral route is selected
-    if (!isCentralRoute) {
-      userSession.strategyIndexChosen += 5;
-    }
-
-    console.log(
-      `Final chosen strategy index: ${userSession.strategyIndexChosen}`,
-    );
+    candidateSelectedStrategies[userSession.strategyIndexChosen] = 0; // Update eligibility
+    if (!isCentralRoute) userSession.strategyIndexChosen += 5;
 
     return isCentralRoute ? 'central' : 'peripheral';
   }
@@ -200,19 +189,29 @@ export class MapService {
   getCurrentStrategy(sessionID: string): string {
     const userSession = this.users[sessionID];
     const isCentralRoute = userSession.y_c > 0.5;
-    const strategies = isCentralRoute
-      ? ['Logic', 'Reasoning', 'Example', 'Evidence', 'Facts']
-      : [
-          'Reciprocity',
-          'Liking',
-          'Social Proof',
-          'Consistency',
-          'Authority',
-          'Scarcity',
-        ];
 
+    const centralStrategies = [
+      'Logic',
+      'Reasoning',
+      'Example',
+      'Evidence',
+      'Facts',
+    ];
+    const peripheralStrategies = [
+      'Reciprocity',
+      'Liking',
+      'Social Proof',
+      'Consistency',
+      'Authority',
+      'Scarcity',
+    ];
+
+    const strategies = isCentralRoute
+      ? centralStrategies
+      : peripheralStrategies;
     const chosenStrategy =
       strategies[userSession.strategyIndexChosen % strategies.length];
+
     console.log(`Chosen strategy for session ${sessionID}: ${chosenStrategy}`);
     return chosenStrategy;
   }
