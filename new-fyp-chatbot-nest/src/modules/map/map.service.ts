@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 interface UserSession {
-  sessionID: string;
+  sessionID?: string;
+  user_id: string;
   y_c: number;
   y_p: number;
   strategyWeights: { central: number[]; peripheral: number[] };
@@ -36,7 +37,7 @@ export class MapService {
 
   async createNewSession(userId: string, exercise: string) {
     this.users[userId] = {
-      sessionID: userId,
+      user_id: userId,
       y_c: 0,
       y_p: 1,
       strategyWeights: {
@@ -52,8 +53,6 @@ export class MapService {
       current_exercise: exercise,
       failedPersuasionCount: 0,
     };
-
-    console.log(`Created new session for userId: ${userId}`);
 
     try {
       await this.supabaseService.insertSessionData({
@@ -77,14 +76,19 @@ export class MapService {
   }
 
   async loadSessionFromSupabase(userId: string) {
-    if (this.users[userId]) return this.users[userId]; // Return from cache if available
+    // Check if the session exists in the cache and has a session ID
+    if (this.users[userId] && this.users[userId].sessionID) {
+      console.log(`Session for userId ${userId} found in cache.`);
+      return this.users[userId]; // Return from cache if available and sessionID exists
+    }
 
     try {
       const data = await this.supabaseService.fetchSessionDataByUserId(userId);
 
       if (data) {
         this.users[userId] = {
-          sessionID: data.user_id,
+          sessionID: data.session_id,
+          user_id: data.user_id,
           y_c: data.y_c,
           y_p: data.y_p,
           strategyWeights: data.strategy_weights,
@@ -143,9 +147,10 @@ export class MapService {
 
   decidePersuasionRoute(
     sessionID: string,
+    userId: string,
     x_m: number,
   ): 'central' | 'peripheral' {
-    const userSession = this.users[sessionID];
+    const userSession = this.users[userId];
 
     // Update motivation levels
     userSession.y_c = x_m;
@@ -186,8 +191,8 @@ export class MapService {
     return isCentralRoute ? 'central' : 'peripheral';
   }
 
-  getCurrentStrategy(sessionID: string): string {
-    const userSession = this.users[sessionID];
+  getCurrentStrategy(userId: string): string {
+    const userSession = this.users[userId];
     const isCentralRoute = userSession.y_c > 0.5;
 
     const centralStrategies = [
@@ -212,7 +217,7 @@ export class MapService {
     const chosenStrategy =
       strategies[userSession.strategyIndexChosen % strategies.length];
 
-    console.log(`Chosen strategy for session ${sessionID}: ${chosenStrategy}`);
+    console.log(`Chosen strategy: ${chosenStrategy}`);
     return chosenStrategy;
   }
 
@@ -263,8 +268,25 @@ export class MapService {
     }
   }
 
-  incrementFailedPersuasionCount(sessionID: string) {
-    const userSession = this.users[sessionID];
+  async incrementFailedPersuasionCount(userId: string) {
+    let userSession = this.getSession(userId);
+
+    // If session does not exist in memory, load it from Supabase
+    if (!userSession) {
+      console.log(
+        `Session not found in memory for user: ${userId}, fetching from Supabase...`,
+      );
+      userSession = await this.loadSessionFromSupabase(userId);
+
+      if (!userSession) {
+        console.error(
+          'No session found to increment failed persuasion count, neither in memory nor in Supabase',
+        );
+        return;
+      }
+    }
+
+    // Increment failed persuasion count and persuasion attempt
     userSession.failedPersuasionCount++;
     userSession.persuasionAttempt++;
 
@@ -275,10 +297,17 @@ export class MapService {
       `Incremented persuasion attempt count: ${userSession.persuasionAttempt}`,
     );
 
-    // Update the session data in Supabase
-    this.supabaseService.updateSessionData(sessionID, {
-      failed_persuasion_count: userSession.failedPersuasionCount,
-      persuasion_attempt: userSession.persuasionAttempt,
-    });
+    // Update the failed persuasion count and attempt in Supabase
+    try {
+      await this.supabaseService.updateSessionData(userId, {
+        failed_persuasion_count: userSession.failedPersuasionCount,
+        persuasion_attempt: userSession.persuasionAttempt,
+      });
+    } catch (error) {
+      console.error(
+        'Error updating failed persuasion count in Supabase:',
+        error,
+      );
+    }
   }
 }

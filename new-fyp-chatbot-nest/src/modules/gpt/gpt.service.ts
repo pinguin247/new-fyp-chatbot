@@ -68,7 +68,7 @@ export class ChatService {
     console.log('Processing chat for user:', userId, 'with message:', content);
 
     try {
-      let userSession = this.mapService.getSession(userId);
+      let userSession = await this.mapService.loadSessionFromSupabase(userId);
 
       // If no session found, create a new one
       if (!userSession) {
@@ -84,9 +84,16 @@ export class ChatService {
         }
 
         // Re-fetch session after creation
-        userSession = this.mapService.getSession(userId);
-        if (!userSession)
+        userSession = await this.mapService.loadSessionFromSupabase(userId);
+        if (!userSession || !userSession.sessionID) {
           throw new Error('Session could not be loaded after creation.');
+        }
+      }
+
+      // Ensure sessionID is valid before proceeding
+      const sessionId = userSession.sessionID;
+      if (!sessionId) {
+        throw new Error('Session ID is missing or null.');
       }
 
       // Save the user's message to Supabase
@@ -101,9 +108,12 @@ export class ChatService {
         return this.handleMotivatedUser(userId);
       }
 
-      // Handle persuasion attempt
       await this.mapService.incrementFailedPersuasionCount(userId);
-      const route = this.mapService.decidePersuasionRoute(userId, x_m);
+      const route = this.mapService.decidePersuasionRoute(
+        sessionId,
+        userId,
+        x_m,
+      );
       const strategy = this.mapService.getCurrentStrategy(userId);
       const prompt = this.generatePrompt(route, userId);
 

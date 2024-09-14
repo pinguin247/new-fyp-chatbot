@@ -194,7 +194,6 @@ export class SupabaseService {
       }
 
       if (!data || data.length === 0) {
-        console.log(`No session data found for user ${userId}`);
         return null; // Return null if no session data is found
       }
 
@@ -205,17 +204,17 @@ export class SupabaseService {
     }
   }
 
-  async updateSessionData(sessionId: string, sessionData: any) {
+  async updateSessionData(userId: string, sessionData: any) {
     try {
       console.log(
-        `Updating session for sessionId: ${sessionId} with data:`,
+        `Updating session for userId: ${userId} with data:`,
         sessionData,
       );
 
       const { error } = await this.supabase
         .from('user_sessions')
         .update(sessionData)
-        .eq('user_id', sessionId); // Assuming 'user_id' is used for filtering
+        .eq('user_id', userId); // Correctly filter by 'user_id'
 
       if (error) {
         console.error(`Error updating session in Supabase: ${error.message}`);
