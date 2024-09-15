@@ -295,4 +295,24 @@ export class SupabaseService {
       return [];
     }
   }
+
+  // Fetch patient input by patient_id
+  async fetchUserInputsByPatientId(patientId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('patient_inputs')
+        .select('*')
+        .eq('patient_id', patientId)
+        .single();
+
+      if (error) {
+        throw new Error(`Error fetching patient inputs: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching patient inputs:', error.message);
+      throw error;
+    }
+  }
 }
