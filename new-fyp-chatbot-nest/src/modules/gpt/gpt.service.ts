@@ -115,7 +115,8 @@ export class ChatService {
         x_m,
       );
       const strategy = this.mapService.getCurrentStrategy(userId);
-      const prompt = this.generatePrompt(route, userId);
+      await this.mapService.updateStrategyWeights(userId, false);
+      const prompt = this.generatePrompt(route, strategy, userId);
 
       console.log(`Selected persuasion route: ${route}, strategy: ${strategy}`);
 
@@ -156,6 +157,9 @@ export class ChatService {
       'assistant',
       confirmationMessage,
     );
+
+    // Update the strategy weights to reflect the successful persuasion
+    await this.mapService.updateStrategyWeights(userId, true);
 
     return { response: confirmationMessage };
   }
@@ -269,8 +273,11 @@ export class ChatService {
     return history;
   }
 
-  generatePrompt(route: 'central' | 'peripheral', userId: string): string {
-    const strategy = this.mapService.getCurrentStrategy(userId);
+  generatePrompt(
+    route: 'central' | 'peripheral',
+    strategy: string,
+    userId: string,
+  ): string {
     const userSession = this.mapService.getSession(userId);
     const exerciseInfo = userSession?.current_exercise || 'an exercise';
     const lastUserResponse =

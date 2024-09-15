@@ -9,9 +9,10 @@ interface UserSession {
   strategyWeights: { central: number[]; peripheral: number[] };
   selectedStrategies: { central: number[]; peripheral: number[] };
   strategyIndexChosen: number;
+  specificStrategyIndex: number;
   persuasionAttempt: number;
-  current_exercise: string; // Track the current exercise
-  failedPersuasionCount: number; // Track the number of failed attempts for the current exercise
+  current_exercise: string;
+  failedPersuasionCount: number;
 }
 
 @Injectable()
@@ -41,14 +42,15 @@ export class MapService {
       y_c: 0,
       y_p: 1,
       strategyWeights: {
-        central: Array(5).fill(0.2), // Simpler way to initialize identical values
-        peripheral: Array(6).fill(0.167),
+        central: [0.2, 0.2, 0.2, 0.2, 0.2],
+        peripheral: [0.167, 0.167, 0.167, 0.167, 0.167, 0.167],
       },
       selectedStrategies: {
-        central: Array(5).fill(1),
-        peripheral: Array(6).fill(1),
+        central: [1, 1, 1, 1, 1],
+        peripheral: [1, 1, 1, 1, 1, 1],
       },
       strategyIndexChosen: 0,
+      specificStrategyIndex: 0, // Initialize specificStrategyIndex
       persuasionAttempt: 0,
       current_exercise: exercise,
       failedPersuasionCount: 0,
@@ -62,6 +64,7 @@ export class MapService {
         strategy_weights: this.users[userId].strategyWeights,
         selected_strategies: this.users[userId].selectedStrategies,
         strategy_index_chosen: 0,
+        specific_strategy_index: 0, // Add specificStrategyIndex to Supabase
         persuasion_attempt: 0,
         current_exercise: exercise,
         failed_persuasion_count: 0,
@@ -94,6 +97,7 @@ export class MapService {
           strategyWeights: data.strategy_weights,
           selectedStrategies: data.selected_strategies,
           strategyIndexChosen: data.strategy_index_chosen || 0,
+          specificStrategyIndex: data.specific_strategy_index || 0, // Load specificStrategyIndex
           persuasionAttempt: data.persuasion_attempt || 0,
           current_exercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
@@ -152,21 +156,44 @@ export class MapService {
   ): 'central' | 'peripheral' {
     const userSession = this.users[userId];
 
-    // Update motivation levels
-    userSession.y_c = x_m;
-    userSession.y_p = 1 - x_m;
+    console.log(`\n--- Deciding Persuasion Route ---`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Initial motivation (x_m): ${x_m}`);
+    console.log(`Persuasion Attempt: ${userSession.persuasionAttempt}`);
+
+    // Only set y_c and y_p on the first attempt
+    if (userSession.persuasionAttempt === 0) {
+      console.log(`First attempt, setting initial y_c and y_p`);
+      userSession.y_c = x_m;
+      if (userSession.y_c < 0.5) {
+        userSession.y_c = 0;
+        userSession.y_p = 1;
+      } else {
+        userSession.y_c = 1;
+        userSession.y_p = 0;
+      }
+    }
 
     console.log(
-      `Updated motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+      `Current motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    const isCentralRoute = userSession.y_c > 0.5;
+    const isCentralRoute = userSession.y_c >= 0.5;
+    console.log(`Chosen route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
+
     const candidateStrategiesWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
     const candidateSelectedStrategies = isCentralRoute
       ? userSession.selectedStrategies.central
       : userSession.selectedStrategies.peripheral;
+
+    console.log(
+      `Candidate Strategy Weights: ${JSON.stringify(candidateStrategiesWeights)}`,
+    );
+    console.log(
+      `Candidate Selected Strategies: ${JSON.stringify(candidateSelectedStrategies)}`,
+    );
 
     // Calculate activation vectors
     const activationVectors: number[] = candidateStrategiesWeights.map(
@@ -176,24 +203,36 @@ export class MapService {
         candidateSelectedStrategies[i],
     );
 
+    console.log(`Activation Vectors: ${JSON.stringify(activationVectors)}`);
+
     // Select strategy based on maximum activation vector
     const maxActivationVector = Math.max(...activationVectors);
     userSession.strategyIndexChosen =
       activationVectors.indexOf(maxActivationVector);
 
-    console.log(
-      `Chosen strategy index: ${userSession.strategyIndexChosen}, Max activation vector: ${maxActivationVector}`,
-    );
+    console.log(`Chosen strategy index: ${userSession.strategyIndexChosen}`);
+    console.log(`Max activation vector: ${maxActivationVector}`);
 
     candidateSelectedStrategies[userSession.strategyIndexChosen] = 0; // Update eligibility
     if (!isCentralRoute) userSession.strategyIndexChosen += 5;
+
+    console.log(
+      `Final strategy index chosen: ${userSession.strategyIndexChosen}`,
+    );
+    console.log(
+      `Updated Selected Strategies: ${JSON.stringify(userSession.selectedStrategies)}`,
+    );
 
     return isCentralRoute ? 'central' : 'peripheral';
   }
 
   getCurrentStrategy(userId: string): string {
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c > 0.5;
+    const isCentralRoute = userSession.y_c >= 0.5;
+
+    console.log(`\n--- Getting Current Strategy ---`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Current Route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
 
     const centralStrategies = [
       'Logic',
@@ -214,55 +253,99 @@ export class MapService {
     const strategies = isCentralRoute
       ? centralStrategies
       : peripheralStrategies;
-    const chosenStrategy =
-      strategies[userSession.strategyIndexChosen % strategies.length];
+    const strategyIndex = isCentralRoute
+      ? userSession.strategyIndexChosen
+      : userSession.strategyIndexChosen - 5;
+
+    console.log(`Strategy Index: ${strategyIndex}`);
+
+    const chosenStrategy = strategies[strategyIndex];
 
     console.log(`Chosen strategy: ${chosenStrategy}`);
+
+    // Alternate between specific sub-strategies using specificStrategyIndex
+    userSession.specificStrategyIndex =
+      (userSession.specificStrategyIndex + 1) % 2;
+    console.log(
+      `Updated specific strategy index: ${userSession.specificStrategyIndex}`,
+    );
+
     return chosenStrategy;
   }
 
-  async updateStrategyWeights(sessionID: string, successful: boolean) {
-    const userSession = this.users[sessionID];
-    const isCentralRoute = userSession.y_c > 0.5;
+  async updateStrategyWeights(userId: string, successful: boolean) {
+    const userSession = this.users[userId];
+    const isCentralRoute = userSession.y_c >= 0.5;
+
+    console.log(`\n--- Updating Strategy Weights ---`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Persuasion Successful: ${successful}`);
+    console.log(`Current Route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
+
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
 
-    const index = userSession.strategyIndexChosen % strategyWeights.length;
+    const index = isCentralRoute
+      ? userSession.strategyIndexChosen
+      : userSession.strategyIndexChosen - 5;
+
+    console.log(`Updating weight for strategy index: ${index}`);
+    console.log(`Current Strategy Weights: ${JSON.stringify(strategyWeights)}`);
+
     const oldWeight = strategyWeights[index];
-    strategyWeights[index] = successful
-      ? strategyWeights[index] + 0.15 * (1 - strategyWeights[index])
-      : strategyWeights[index] * 0.85;
+    strategyWeights[index] =
+      0.1 * (1 - strategyWeights[index]) * (successful ? 1 : 0) -
+      0.9 * strategyWeights[index];
 
     console.log(
-      `Updated strategy weight for index ${index} from ${oldWeight} to ${strategyWeights[index]}`,
+      `Updated strategy weight for index ${index}: ${oldWeight} -> ${strategyWeights[index]}`,
     );
 
     // Adjust route activation values
-    if (successful) {
-      userSession.y_c += 0.3;
-      userSession.y_p -= 0.3;
+    console.log(
+      `Before adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+    );
+
+    if (isCentralRoute) {
+      if (successful) {
+        userSession.y_c += 0.2;
+        userSession.y_p -= 0.2;
+      } else {
+        userSession.y_c -= 0.1;
+        userSession.y_p += 0.1;
+      }
     } else {
-      userSession.y_c -= 0.2;
-      userSession.y_p += 0.2;
+      if (successful) {
+        userSession.y_c -= 0.2;
+        userSession.y_p += 0.2;
+      } else {
+        userSession.y_c += 0.2;
+        userSession.y_p -= 0.2;
+      }
     }
 
+    userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
+    userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
+
     console.log(
-      `Updated route activation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+      `After adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
     // Update session data in Supabase
     try {
-      await this.supabaseService.updateSessionData(sessionID, {
+      await this.supabaseService.updateSessionData(userId, {
         y_c: userSession.y_c,
         y_p: userSession.y_p,
         strategy_weights: userSession.strategyWeights,
         selected_strategies: userSession.selectedStrategies,
         strategy_index_chosen: userSession.strategyIndexChosen,
+        specific_strategy_index: userSession.specificStrategyIndex,
         persuasion_attempt: userSession.persuasionAttempt,
         current_exercise: userSession.current_exercise,
         failed_persuasion_count: userSession.failedPersuasionCount,
       });
+      console.log(`Successfully updated session data in Supabase`);
     } catch (error) {
       console.error('Error updating session in Supabase:', error);
     }
