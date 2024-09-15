@@ -18,6 +18,7 @@ export default function Chatbot() {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null); // State to store user's full name
   const isFirstLoad = useRef(true); // Track if it's the first page load
 
   // Fetch the current user from Supabase
@@ -33,25 +34,30 @@ export default function Chatbot() {
       } else if (user) {
         setUserId(user.id); // Set the user ID in state
         console.log('User ID fetched from Supabase:', user.id);
+
+        // Fetch user's profile to get the full_name
+        const { data: userProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+        } else if (userProfile) {
+          setUserName(userProfile.full_name); // Set the user's full name in state
+          console.log(
+            'User full_name fetched from Supabase:',
+            userProfile.full_name,
+          );
+        }
       }
     };
 
     fetchUser();
 
-    // Declare the starting message
-    const startingMessage: IMessage = {
-      _id: Math.round(Math.random() * 1000000),
-      text: 'Hello! I am your chatbot. How can I help you?',
-      createdAt: new Date(),
-      user: {
-        _id: 2,
-        name: 'Chatbot',
-        avatar: 'https://placekitten.com/200/300',
-      },
-    };
-
     const loadChatHistory = async () => {
-      if (!userId) return; // If user ID is not yet loaded, do nothing
+      if (!userId || !userName) return; // Ensure both userId and userName are loaded
 
       const history = await fetchHistory(userId);
       const formattedHistory: IMessage[] = history.map((message: any) => ({
@@ -60,7 +66,7 @@ export default function Chatbot() {
         createdAt: new Date(message.created_at),
         user: {
           _id: message.role === 'user' ? 1 : 2,
-          name: message.role === 'user' ? 'User' : 'Chatbot',
+          name: message.role === 'user' ? userName : 'Chatbot',
           avatar:
             message.role === 'user'
               ? undefined
@@ -73,6 +79,18 @@ export default function Chatbot() {
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
+
+      // Declare the starting message with the user's full name
+      const startingMessage: IMessage = {
+        _id: Math.round(Math.random() * 1000000),
+        text: `Hello ${userName}! I am your chatbot. How can I assist you today?`,
+        createdAt: new Date(),
+        user: {
+          _id: 2,
+          name: 'Chatbot',
+          avatar: 'https://placekitten.com/200/300',
+        },
+      };
 
       // Always send the two messages when the page first loads
       if (isFirstLoad.current) {
@@ -90,7 +108,7 @@ export default function Chatbot() {
     };
 
     loadChatHistory();
-  }, [userId]);
+  }, [userId, userName]);
 
   // Function to recommend an exercise, reset persuasion_attempt, and create/update session as needed
   const recommendExercise = async (userId: string) => {
@@ -225,7 +243,7 @@ export default function Chatbot() {
     <GiftedChat
       messages={messages}
       onSend={(newMessages) => handleSend(newMessages)}
-      user={{ _id: 1, name: 'User' }}
+      user={{ _id: 1, name: userName || 'User' }} // Use user's full name in the chat if available
       renderAvatar={renderAvatar}
       isTyping={isLoading} // Show typing indicator when loading
     />
