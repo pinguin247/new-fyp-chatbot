@@ -66,4 +66,16 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  .fixed-dialog {
+    max-width: 600px; /* Set a fixed width */
+    max-height: 80vh; /* Set a maximum height */
+    overflow: hidden; /* Ensure content does not overflow */
+  }
+  
+  .scrollable-content {
+    max-height: calc(80vh - 100px); /* Allow content to scroll within the fixed height */
+    overflow-y: auto; /* Enable vertical scrolling */
+    padding-right: 15px; /* Add padding for scrollbar space */
+  }
 }

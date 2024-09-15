@@ -26,7 +26,6 @@ function PatientListTable() {
     return (
       <AlertDialog>
         <AlertDialogTrigger>
-          {" "}
           <Button variant="destructive">
             <Trash />
           </Button>
@@ -35,8 +34,8 @@ function PatientListTable() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              account and remove your data from our servers.
+              This action cannot be undone. This will permanently delete the
+              patient's data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -56,18 +55,49 @@ function PatientListTable() {
 
   // Column Definitions: Defines the columns to be displayed.
   const [colDefs, setColDefs] = useState([
-    { field: "id", filter: true },
-    { field: "name", filter: true },
-    { field: "email", filter: true },
-    { field: "contact", filter: true },
-    { field: "action", cellRenderer: CustomButtons },
+    { field: "name", headerName: "Name", filter: true },
+    { field: "email", headerName: "Email", filter: true },
+    { field: "phoneNumber", headerName: "Phone Number", filter: true },
+    { field: "age", headerName: "Age", filter: true },
+    { field: "gender", headerName: "Gender", filter: true },
+    {
+      field: "medicalCondition",
+      headerName: "Medical Condition",
+      filter: true,
+    },
+    { field: "disabilityLevel", headerName: "Disability Level", filter: true },
+    { field: "action", headerName: "Action", cellRenderer: CustomButtons },
   ]);
 
   // Row Data: The data to be displayed.
   const [rowData, setRowData] = useState([
-    { make: "Tesla", model: "Model Y", price: 64950, electric: true },
-    { make: "Ford", model: "F-Series", price: 33850, electric: false },
-    { make: "Toyota", model: "Corolla", price: 29600, electric: false },
+    {
+      name: "John Doe",
+      email: "john.doe@example.com",
+      phoneNumber: "+1 123 456 7890",
+      age: 45,
+      gender: "Male",
+      medicalCondition: "Hypertension",
+      disabilityLevel: "Moderate",
+    },
+    {
+      name: "Jane Smith",
+      email: "jane.smith@example.com",
+      phoneNumber: "+44 123 456 7890",
+      age: 33,
+      gender: "Female",
+      medicalCondition: "Diabetes",
+      disabilityLevel: "Low",
+    },
+    {
+      name: "Mark Taylor",
+      email: "mark.taylor@example.com",
+      phoneNumber: "+91 987 654 3210",
+      age: 55,
+      gender: "Male",
+      medicalCondition: "None",
+      disabilityLevel: "None",
+    },
   ]);
 
   const [searchInput, setSearchInput] = useState();
