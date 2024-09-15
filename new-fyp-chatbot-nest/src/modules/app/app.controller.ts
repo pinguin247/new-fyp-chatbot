@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Post,
+  Get,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -26,5 +27,38 @@ export class AppController {
     }
 
     return { profileId: id };
+  }
+
+  @Post('add-patient')
+  async addNewPatient(@Body() doctorInputData: any) {
+    try {
+      const result = await this.supabaseService.addNewPatient(doctorInputData);
+
+      if (!result.success) {
+        throw new HttpException(result.message, HttpStatus.BAD_REQUEST);
+      }
+
+      return { success: true, message: 'Patient added successfully' };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('get-patient-names')
+  async getPatientNames() {
+    try {
+      const patients = await this.supabaseService.getPatientNames();
+
+      if (!patients || patients.length === 0) {
+        throw new HttpException('No patients found', HttpStatus.NOT_FOUND);
+      }
+
+      return { patients };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'An error occurred while fetching patient names',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

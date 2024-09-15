@@ -315,4 +315,41 @@ export class SupabaseService {
       throw error;
     }
   }
+
+  async addNewPatient(doctorInputData: any) {
+    try {
+      // Insert into doctor_inputs table
+      const { error: insertError } = await this.supabase
+        .from('doctor_inputs')
+        .insert([doctorInputData]);
+
+      if (insertError) {
+        throw new Error(
+          `Error inserting into doctor_inputs: ${insertError.message}`,
+        );
+      }
+
+      return { success: true, message: 'Patient added successfully' };
+    } catch (error) {
+      throw new Error(`Failed to add new patient: ${error.message}`);
+    }
+  }
+
+  async getPatientNames() {
+    try {
+      const { data, error } = await this.supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('role', 'patient'); // Filter by patients only
+
+      if (error) {
+        throw new Error(`Error fetching patient names: ${error.message}`);
+      }
+
+      return data; // Return the array of patients
+    } catch (error) {
+      console.error('Error fetching patient names:', error.message);
+      throw error;
+    }
+  }
 }
