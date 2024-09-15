@@ -275,4 +275,24 @@ export class SupabaseService {
       throw error;
     }
   }
+
+  async fetchExamplesByStrategy(strategyName: string): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('strategies')
+        .select('example')
+        .eq('strategy_name', strategyName);
+
+      if (error) {
+        throw new Error(
+          `Error fetching examples for strategy: ${error.message}`,
+        );
+      }
+
+      return data.map((item) => item.example); // Return all examples as an array
+    } catch (error) {
+      console.error('Error fetching strategy examples:', error.message);
+      return [];
+    }
+  }
 }

@@ -115,10 +115,31 @@ export class ChatService {
         x_m,
       );
       const strategy = this.mapService.getCurrentStrategy(userId);
-      await this.mapService.updateStrategyWeights(userId, false);
-      const prompt = this.generatePrompt(route, strategy, userId);
 
-      console.log(`Selected persuasion route: ${route}, strategy: ${strategy}`);
+      // Fetch examples based on the selected strategy (returns an array of examples)
+      const strategyExamples =
+        await this.supabaseService.fetchExamplesByStrategy(strategy);
+
+      if (!strategyExamples || strategyExamples.length === 0) {
+        throw new Error(`No examples found for strategy: ${strategy}`);
+      }
+
+      // Concatenate the examples into a single string
+      const strategyExampleText = strategyExamples.join(' ');
+
+      // Get the current exercise for the session
+      const currentExercise = userSession?.current_exercise || 'exercise';
+
+      // Generate prompt with the concatenated examples and current exercise
+      const prompt = this.generatePrompt(
+        route,
+        strategy,
+        strategyExampleText,
+        currentExercise,
+      );
+
+      // Log the prompt that will be sent to the API
+      console.log('Sending the following prompt to GPT API:', prompt);
 
       // Get response from GPT
       const botMessage = await this.generateGPTResponse(prompt);
@@ -165,24 +186,68 @@ export class ChatService {
   }
 
   // Handle persuasion logic for 3 and 6 attempts
+  // Handle persuasion logic for 3 and 6 attempts
   private async handlePersuasionAttempts(
     userId: string,
     userSession: any,
     botMessage: string,
   ) {
-    // Recommend a new exercise after 3 failed persuasion attempts
+    // On the 3rd attempt, recommend a new exercise and use a dynamic prompt
     if (userSession.persuasionAttempt === 3) {
+      console.log(
+        `3rd attempt reached for user ${userId}, recommending a new exercise.`,
+      );
+
+      // Fetch a new exercise
       let newExercise;
       do {
         newExercise = await this.supabaseService.fetchRandomExercise();
       } while (newExercise.name === userSession.current_exercise);
 
-      console.log(`Switching to a new exercise: ${newExercise.name}`);
+      console.log(`New exercise recommended: ${newExercise.name}`);
+
+      // Update the session with the new exercise
       userSession.current_exercise = newExercise.name;
       userSession.failedPersuasionCount = 0;
 
       await this.updateSession(userId, newExercise.id);
-      return { response: `What about trying ${newExercise.name}?` };
+
+      // Fetch an example for the persuasion strategy
+      const strategy = this.mapService.getCurrentStrategy(userId);
+      const strategyExamples =
+        await this.supabaseService.fetchExamplesByStrategy(strategy);
+
+      if (!strategyExamples || strategyExamples.length === 0) {
+        throw new Error(`No example found for strategy: ${strategy}`);
+      }
+
+      // Generate a dynamic and persuasive prompt with the new exercise
+      const prompt = this.generateDynamicPromptWithNewExercise(
+        strategy,
+        strategyExamples,
+        newExercise.name, // Use the new exercise here
+      );
+
+      console.log(`Generated prompt for 3rd attempt: ${prompt}`);
+
+      // Get response from GPT
+      const gptResponse = await this.generateGPTResponse(prompt);
+
+      console.log(`GPT response for 3rd attempt: ${gptResponse}`);
+
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: gptResponse,
+      });
+
+      // Save the recommendation response in Supabase
+      await this.supabaseService.insertChatHistory(
+        userId,
+        'assistant',
+        gptResponse,
+      );
+
+      return { response: gptResponse };
     }
 
     // Give up after 6 failed attempts
@@ -276,19 +341,36 @@ export class ChatService {
   generatePrompt(
     route: 'central' | 'peripheral',
     strategy: string,
-    userId: string,
+    strategyExamples: string, // Pass examples as a single string
+    currentExercise: string, // Include exercise in prompt
   ): string {
-    const userSession = this.mapService.getSession(userId);
-    const exerciseInfo = userSession?.current_exercise || 'an exercise';
     const lastUserResponse =
       this.conversationHistory.reverse().find((msg) => msg.role === 'user')
         ?.content || '';
 
+    // Add the strategy examples and exercise to the prompt
     if (route === 'central') {
-      return `The user responded with: "${lastUserResponse}". Now explain the health benefits of ${exerciseInfo}. Strategy: ${strategy}`;
+      return `The user responded with: "${lastUserResponse}". Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique response based on this but do not copy the examples exactly. Strategy: ${strategy}.`;
     } else {
-      return `The user responded with: "${lastUserResponse}". Encourage the user to do ${exerciseInfo} in a friendly tone. Strategy: ${strategy}`;
+      return `The user responded with: "${lastUserResponse}". Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a new response that is based on but does not exactly copy the examples. Strategy: ${strategy}.`;
     }
+  }
+
+  generateDynamicPromptWithNewExercise(
+    strategy: string,
+    strategyExamples: string[],
+    newExercise: string, // The newly recommended exercise
+  ): string {
+    const lastUserResponse =
+      this.conversationHistory.reverse().find((msg) => msg.role === 'user')
+        ?.content || '';
+
+    // Randomly select a strategy example as a reference
+    const exampleToUse =
+      strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
+
+    // Use the new exercise and strategy example in the prompt
+    return `The user responded with: "${lastUserResponse}". Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}.`;
   }
 
   async updateStrategyWeights(userId: string, successful: boolean) {
