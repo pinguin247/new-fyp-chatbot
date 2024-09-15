@@ -1,66 +1,88 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, Alert, ToastAndroid } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Alert, ToastAndroid, Modal } from 'react-native';
 import { Button, Input } from '@rneui/themed';
-import { Session } from '@supabase/supabase-js';
-import React from 'react';
-import { router } from 'expo-router';
+import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../lib/supabase';
+import { Session } from '@supabase/supabase-js';
+import { router } from 'expo-router';
 
 export default function Profile({ session }: { session: Session }) {
-  const [loading, setLoading] = useState(false); // Initially set to false
+  const [loading, setLoading] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [username, setUsername] = useState('');
-  const [website, setWebsite] = useState('');
+  const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
+  // Personal details fields for the modal
+  const [age, setAge] = useState(18); // Default age set to 18
+  const [phoneNumber, setPhoneNumber] = useState(''); // New phone number field
+  const [country, setCountry] = useState(''); // New country field
+  const [gender, setGender] = useState('Male');
+  const [modalVisible, setModalVisible] = useState(false);
+
   useEffect(() => {
-    if (session) getProfile();
-  }, [session]);
+    const fetchSessionAndProfile = async () => {
+      try {
+        setLoading(true);
 
-  async function getProfile() {
-    try {
-      setLoading(true);
-      if (!session?.user) throw new Error('No user on the session!');
+        // Fetch session
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
 
-      const { data, error, status } = await supabase
-        .from('profiles')
-        .select(`username, website, avatar_url`)
-        .eq('id', session?.user.id)
-        .single();
-      if (error && status !== 406) {
-        throw error;
+        if (sessionError) {
+          console.error('Error fetching session:', sessionError);
+          return;
+        }
+
+        if (sessionData?.session) {
+          setEmail(sessionData.session.user.email ?? '');
+
+          // Fetch profile data
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .eq('id', sessionData.session.user.id)
+            .single();
+
+          if (profileError) {
+            console.error('Error fetching profile data:', profileError);
+            return;
+          }
+
+          if (profileData) {
+            setUsername(profileData.full_name);
+            setAvatarUrl(profileData.avatar_url);
+            setProfileId(profileData.id); // Store the profile ID for later use
+          }
+        }
+      } catch (error) {
+        console.error('Error in fetchSessionAndProfile:', error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      if (data) {
-        setUsername(data.username);
-        setWebsite(data.website);
-        setAvatarUrl(data.avatar_url);
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        Alert.alert(error.message);
-      }
-    } finally {
-      setLoading(false); // Make sure loading is reset here
-    }
-  }
+    fetchSessionAndProfile();
+  }, []);
 
-  async function updateProfile({
+  // Update profile function
+  const updateProfile = async ({
     username,
-    website,
     avatar_url,
   }: {
     username: string;
-    website: string;
     avatar_url: string;
-  }) {
+  }) => {
     try {
       setLoading(true);
-      if (!session?.user) throw new Error('No user on the session!');
+
+      if (!profileId) {
+        throw new Error('Profile ID is not available.');
+      }
 
       const updates = {
-        id: session?.user.id,
-        username,
-        website,
+        id: profileId,
+        full_name: username, // Assuming full_name is the field for username in profiles table
         avatar_url,
         updated_at: new Date(),
       };
@@ -74,27 +96,68 @@ export default function Profile({ session }: { session: Session }) {
       ToastAndroid.show('Profile updated successfully', ToastAndroid.SHORT);
     } catch (error) {
       if (error instanceof Error) {
-        Alert.alert(error.message);
+        Alert.alert('Error', error.message);
       }
     } finally {
-      setLoading(false); // Ensure loading is reset here after updating profile
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      setLoading(true); // Optional: Add loading state here if needed
-      await logout();
-      ToastAndroid.show('Logged out successfully', ToastAndroid.SHORT);
-      router.replace('/'); // Adjust the route as necessary
-    } catch (error) {
-      ToastAndroid.show('Error logging out', ToastAndroid.LONG);
-    } finally {
-      setLoading(false); // Ensure loading is reset here after logout
+      setLoading(false);
     }
   };
 
-  async function logout() {
+  const handleSavePersonalDetails = async () => {
+    try {
+      setLoading(true);
+
+      if (!profileId) {
+        throw new Error('Profile ID is not available.');
+      }
+
+      const newRecord = {
+        patient_id: profileId, // Use the stored profile ID as the foreign key
+        age: age, // Age as a number
+        phone_number: phoneNumber, // New phone number field
+        country: country, // New country field
+        gender: gender, // Gender value
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      const { error, data } = await supabase
+        .from('patient_inputs')
+        .insert(newRecord);
+
+      if (error) {
+        console.error('Error inserting data:', error);
+        throw error;
+      }
+
+      ToastAndroid.show(
+        'Personal details saved successfully',
+        ToastAndroid.SHORT,
+      );
+      setModalVisible(false);
+    } catch (error) {
+      if (error instanceof Error) {
+        Alert.alert('Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      await logout();
+      ToastAndroid.show('Logged out successfully', ToastAndroid.SHORT);
+      router.replace('/');
+    } catch (error) {
+      ToastAndroid.show('Error logging out', ToastAndroid.LONG);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -104,12 +167,15 @@ export default function Profile({ session }: { session: Session }) {
     } catch (error: any) {
       console.error('Error signing out: ', error.message);
     }
-  }
+  };
+
+  // Generate an array of ages (e.g., 18 to 100)
+  const ageOptions = Array.from({ length: 99 }, (_, index) => index + 1);
 
   return (
     <View style={styles.container}>
       <View style={[styles.verticallySpaced, styles.mt20]}>
-        <Input label="Email" value={session?.user?.email} disabled />
+        <Input label="Email" value={email} disabled />
       </View>
       <View style={styles.verticallySpaced}>
         <Input
@@ -118,23 +184,74 @@ export default function Profile({ session }: { session: Session }) {
           onChangeText={(text) => setUsername(text)}
         />
       </View>
-      <View style={styles.verticallySpaced}>
-        <Input
-          label="Website"
-          value={website || ''}
-          onChangeText={(text) => setWebsite(text)}
-        />
-      </View>
 
       <View style={[styles.verticallySpaced, styles.mt20]}>
         <Button
-          title={loading ? 'Loading ...' : 'Update'}
-          onPress={() =>
-            updateProfile({ username, website, avatar_url: avatarUrl })
-          }
-          disabled={loading} // Disable the button while loading
+          title={loading ? 'Loading ...' : 'Update Profile'}
+          onPress={() => updateProfile({ username, avatar_url: avatarUrl })}
+          disabled={loading}
         />
       </View>
+
+      <View style={styles.verticallySpaced}>
+        <Button
+          title="Add Personal Details"
+          onPress={() => setModalVisible(true)}
+        />
+      </View>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            {/* Age Picker */}
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={age}
+                onValueChange={(itemValue) => setAge(itemValue)}
+              >
+                {ageOptions.map((ageOption) => (
+                  <Picker.Item
+                    key={ageOption}
+                    label={String(ageOption)}
+                    value={ageOption}
+                  />
+                ))}
+              </Picker>
+            </View>
+
+            <Input
+              label="Phone Number"
+              value={phoneNumber}
+              onChangeText={(text) => setPhoneNumber(text)}
+              keyboardType="phone-pad"
+            />
+            <Input
+              label="Country"
+              value={country}
+              onChangeText={(text) => setCountry(text)}
+            />
+
+            {/* Gender Picker */}
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={gender}
+                onValueChange={(itemValue) => setGender(itemValue)}
+              >
+                <Picker.Item label="Male" value="Male" />
+                <Picker.Item label="Female" value="Female" />
+              </Picker>
+            </View>
+
+            <Button title="Save" onPress={handleSavePersonalDetails} />
+            <Button title="Close" onPress={() => setModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.verticallySpaced}>
         <Button title="Sign Out" onPress={handleLogout} />
@@ -155,5 +272,21 @@ const styles = StyleSheet.create({
   },
   mt20: {
     marginTop: 20,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    margin: 20,
+  },
+  pickerContainer: {
+    marginVertical: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
   },
 });
