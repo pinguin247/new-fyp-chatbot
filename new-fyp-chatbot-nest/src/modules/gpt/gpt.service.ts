@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { SupabaseService } from '../supabase/supabase.service';
-import { MapService } from '../map/map.service'; // Import the MapService
-
+import { MapService } from '../map/map.service';
+import { PatientService } from '../patient/patient.service';
 @Injectable()
 export class ChatService {
   private openai: OpenAI;
@@ -14,6 +14,7 @@ export class ChatService {
   constructor(
     private readonly supabaseService: SupabaseService, // Inject SupabaseService
     private readonly mapService: MapService,
+    private readonly patientService: PatientService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -100,6 +101,10 @@ export class ChatService {
       const patientDetails =
         await this.supabaseService.fetchUserInputsByPatientId(userId);
 
+      //Fetch Doctor Inputs
+      const doctorInput =
+        await this.patientService.getDoctorInputsByPatientId(userId);
+
       // Save the user's message to Supabase
       await this.supabaseService.insertChatHistory(userId, 'user', content);
       this.conversationHistory.push({ role: 'user', content });
@@ -119,6 +124,7 @@ export class ChatService {
         x_m,
       );
       const strategy = this.mapService.getCurrentStrategy(userId);
+      await this.mapService.updateStrategyWeights(userId, false);
 
       // Fetch examples based on the selected strategy (returns an array of examples)
       const strategyExamples =
@@ -140,7 +146,8 @@ export class ChatService {
         strategy,
         strategyExampleText,
         currentExercise,
-        patientDetails, // Pass the patient details for personalization
+        patientDetails,
+        doctorInput,
       );
 
       // Log the prompt that will be sent to the API
@@ -230,12 +237,17 @@ export class ChatService {
       const patientDetails =
         await this.supabaseService.fetchUserInputsByPatientId(userId);
 
+      //Fetch Doctor Inputs
+      const doctorInput =
+        await this.patientService.getDoctorInputsByPatientId(userId);
+
       // Generate a dynamic and persuasive prompt with the new exercise
       const prompt = this.generateDynamicPromptWithNewExercise(
         strategy,
         strategyExamples,
         newExercise.name, // Use the new exercise here
         patientDetails,
+        doctorInput,
       );
 
       console.log(`Generated prompt for 3rd attempt: ${prompt}`);
@@ -354,6 +366,7 @@ export class ChatService {
     strategyExamples: string, // Pass examples as a single string
     currentExercise: string, // Include exercise in prompt
     patientDetails: any, // Include patient details
+    doctorInputs: any,
   ): string {
     const lastUserResponse =
       this.conversationHistory.reverse().find((msg) => msg.role === 'user')
@@ -366,18 +379,24 @@ export class ChatService {
       country: 'unknown',
     };
 
+    const { medical_condition, disability_level } = doctorInputs || {
+      medical_condition: 'unknown',
+      disability_level: 'unknown',
+    };
+
     // Add the strategy examples, exercise, and patient details to the prompt
     if (route === 'central') {
-      return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country} who is ${age} years old. They are ${gender}. Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country}, is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     } else {
-      return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country} who is ${age} years old. They are ${gender}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a new response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country}, is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a new response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     }
   }
   generateDynamicPromptWithNewExercise(
     strategy: string,
     strategyExamples: string[],
-    newExercise: string, // The newly recommended exercise\
-    patientDetails: any, // Include patient details
+    newExercise: string,
+    patientDetails: any,
+    doctorInputs: any,
   ): string {
     const lastUserResponse =
       this.conversationHistory.reverse().find((msg) => msg.role === 'user')
@@ -388,6 +407,11 @@ export class ChatService {
       age: 'unknown',
       gender: 'unknown',
       country: 'unknown',
+    };
+
+    const { medical_condition, disability_level } = doctorInputs || {
+      medical_condition: 'unknown',
+      disability_level: 'unknown',
     };
 
     // Randomly select a strategy example as a reference
@@ -395,7 +419,7 @@ export class ChatService {
       strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
 
     // Use the new exercise and strategy example in the prompt
-    return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country} who is ${age} years old. They are ${gender}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+    return `The user responded with: "${lastUserResponse}". For background info, this patient is from ${country}, is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
   }
 
   async updateStrategyWeights(userId: string, successful: boolean) {

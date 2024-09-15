@@ -214,7 +214,13 @@ export class MapService {
     console.log(`Max activation vector: ${maxActivationVector}`);
 
     candidateSelectedStrategies[userSession.strategyIndexChosen] = 0; // Update eligibility
-    if (!isCentralRoute) userSession.strategyIndexChosen += 5;
+    // Ensure strategyIndexChosen is within bounds
+    if (isCentralRoute) {
+      userSession.strategyIndexChosen %= 5; // 5 central strategies
+    } else {
+      userSession.strategyIndexChosen =
+        (userSession.strategyIndexChosen + 5) % 6; // 6 peripheral strategies
+    }
 
     console.log(
       `Final strategy index chosen: ${userSession.strategyIndexChosen}`,
@@ -253,9 +259,14 @@ export class MapService {
     const strategies = isCentralRoute
       ? centralStrategies
       : peripheralStrategies;
-    const strategyIndex = isCentralRoute
-      ? userSession.strategyIndexChosen
-      : userSession.strategyIndexChosen - 5;
+    let strategyIndex = userSession.strategyIndexChosen;
+
+    // Ensure the strategyIndex is within bounds of the current route's strategies
+    if (isCentralRoute) {
+      strategyIndex = strategyIndex % centralStrategies.length;
+    } else {
+      strategyIndex = strategyIndex % peripheralStrategies.length;
+    }
 
     console.log(`Strategy Index: ${strategyIndex}`);
 
@@ -287,8 +298,8 @@ export class MapService {
       : userSession.strategyWeights.peripheral;
 
     const index = isCentralRoute
-      ? userSession.strategyIndexChosen
-      : userSession.strategyIndexChosen - 5;
+      ? userSession.strategyIndexChosen % 5 // 5 central strategies
+      : userSession.strategyIndexChosen % 6; // 6 peripheral strategies
 
     console.log(`Updating weight for strategy index: ${index}`);
     console.log(`Current Strategy Weights: ${JSON.stringify(strategyWeights)}`);

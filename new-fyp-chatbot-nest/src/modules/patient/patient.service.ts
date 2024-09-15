@@ -93,4 +93,26 @@ export class PatientService {
       );
     }
   }
+
+  // New function to fetch doctor_inputs by patient_id
+  async getDoctorInputsByPatientId(patientId: string) {
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('doctor_inputs')
+        .select('*') // Select all columns, or specify the necessary columns
+        .eq('patient_id', patientId)
+        .single();
+
+      if (error) {
+        throw new Error(`Error fetching doctor inputs: ${error.message}`);
+      }
+      console.log(data);
+
+      return data; // Return the fetched data directly
+    } catch (error) {
+      console.error('Error fetching doctor inputs:', error.message);
+      throw error; // Rethrow the error to handle it properly
+    }
+  }
 }
