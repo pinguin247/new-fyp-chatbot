@@ -11,32 +11,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { toast } from "sonner";
-import FileUpload from "./FileUpload"; // Import your FileUpload component
-import { PaintBucket } from "lucide-react";
+import FileUpload from "./FileUpload";
 
 type Inputs = {
-  patientId: string; // This will store the selected patient's ID
+  patientId: string;
   moderate_hr_min: string;
   moderate_hr_max: string;
   vigorous_hr_min: string;
   vigorous_hr_max: string;
   target_duration_week: string;
-  prompt_times: string; // Prompt times (comma-separated or array)
+  prompt_times: string;
   medical_condition: string;
   disability_level: string;
 };
 
-function AddNewPatient() {
+type AddNewPatientProps = {
+  onPatientAdded: () => void; // Callback to refresh data after adding a new patient
+};
+
+function AddNewPatient({ onPatientAdded }: AddNewPatientProps) {
   const [open, setOpen] = useState(false);
-  const [patients, setPatients] = useState<any[]>([]); // Initialize as an array
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]); // Track uploaded files
+  const [patients, setPatients] = useState<any[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
   } = useForm<Inputs>();
 
-  // Fetch the list of patients from the profiles table
+  const moderate_hr_min = watch("moderate_hr_min");
+  const vigorous_hr_min = watch("vigorous_hr_min");
+
   useEffect(() => {
     const fetchPatients = async () => {
       try {
@@ -48,9 +54,9 @@ function AddNewPatient() {
         const data = await response.json();
 
         if (Array.isArray(data.patients)) {
-          setPatients(data.patients); // Set the patients array
+          setPatients(data.patients);
         } else {
-          setPatients([]); // Default to empty array if no patients are returned
+          setPatients([]);
         }
       } catch (error) {
         toast.error("Error fetching patients.");
@@ -71,12 +77,10 @@ function AddNewPatient() {
         return;
       }
 
-      // Convert prompt_times from string to array
       const promptTimesArray = data.prompt_times
         .split(",")
         .map((time) => time.trim());
 
-      // First submit the patient details (excluding the files) to the add-patient API
       const patientDetails = {
         patient_id: data.patientId,
         moderate_hr_min: data.moderate_hr_min,
@@ -109,14 +113,9 @@ function AddNewPatient() {
 
       toast.success("Patient details added successfully.");
 
-      // Then, submit the uploaded files to the parse-and-upload API
       if (uploadedFiles.length > 0) {
         const formData = new FormData();
-
-        // Include the profileID (patient_id)
         formData.append("profileID", data.patientId);
-
-        // Append uploaded files with the field name 'files'
         uploadedFiles.forEach((file) => {
           formData.append("files", file);
         });
@@ -137,8 +136,9 @@ function AddNewPatient() {
           toast.error("Failed to parse and upload files.");
         }
       }
+      onPatientAdded();
 
-      setOpen(false); // Close modal after successful submission
+      setOpen(false);
     } catch (error) {
       toast.error("Error submitting patient data.");
     }
@@ -153,7 +153,6 @@ function AddNewPatient() {
             <DialogTitle>Add New Patient</DialogTitle>
             <DialogDescription>
               <form onSubmit={handleSubmit(onSubmit)}>
-                {/* Dropdown for patient selection */}
                 <div className="py-3">
                   <label>Patient</label>
                   <select
@@ -176,7 +175,6 @@ function AddNewPatient() {
                   )}
                 </div>
 
-                {/* Other input fields */}
                 <div className="py-3">
                   <label>Moderate Heart Rate (Min)</label>
                   <Input
@@ -193,10 +191,18 @@ function AddNewPatient() {
                   <Input
                     type="number"
                     placeholder="Enter Max HR"
-                    {...register("moderate_hr_max", { required: true })}
+                    {...register("moderate_hr_max", {
+                      required: true,
+                      validate: (value) =>
+                        parseInt(value) > parseInt(moderate_hr_min) ||
+                        "Max moderate heart rate must be more than min moderate heart rate",
+                    })}
                   />
                   {errors.moderate_hr_max && (
-                    <p className="text-red-500">This field is required</p>
+                    <p className="text-red-500">
+                      {errors.moderate_hr_max.message ||
+                        "This field is required"}
+                    </p>
                   )}
                 </div>
                 <div className="py-3">
@@ -215,10 +221,18 @@ function AddNewPatient() {
                   <Input
                     type="number"
                     placeholder="Enter Max Vigorous HR"
-                    {...register("vigorous_hr_max", { required: true })}
+                    {...register("vigorous_hr_max", {
+                      required: true,
+                      validate: (value) =>
+                        parseInt(value) > parseInt(vigorous_hr_min) ||
+                        "Max vigorous heart rate must be more than min vigorous heart rate",
+                    })}
                   />
                   {errors.vigorous_hr_max && (
-                    <p className="text-red-500">This field is required</p>
+                    <p className="text-red-500">
+                      {errors.vigorous_hr_max.message ||
+                        "This field is required"}
+                    </p>
                   )}
                 </div>
                 <div className="py-3">
@@ -268,7 +282,6 @@ function AddNewPatient() {
                   )}
                 </div>
 
-                {/* File upload field */}
                 <div className="py-3">
                   <label>Upload Files</label>
                   <FileUpload onFilesUploaded={handleFilesUploaded} />

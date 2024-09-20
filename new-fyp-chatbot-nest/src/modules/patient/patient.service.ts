@@ -5,9 +5,38 @@ import { SupabaseService } from '../supabase/supabase.service';
 export class PatientService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async addPatientToDisplayTable(patientId: string): Promise<any> {
+  async addNewPatient(doctorInputData: any) {
     try {
-      // Fetch data from profiles table
+      // Insert into doctor_inputs table
+      const { error: insertError } = await this.supabaseService
+        .getClient()
+        .from('doctor_inputs')
+        .insert([doctorInputData]);
+
+      if (insertError) {
+        throw new Error(
+          `Error inserting into doctor_inputs: ${insertError.message}`,
+        );
+      }
+
+      // If successful, pass the doctorInputData to addPatientToDisplayTable
+      await this.addPatientToDisplayTable(
+        doctorInputData.patient_id,
+        doctorInputData,
+      );
+
+      return { success: true, message: 'Patient added successfully' };
+    } catch (error) {
+      throw new Error(`Failed to add new patient: ${error.message}`);
+    }
+  }
+
+  async addPatientToDisplayTable(
+    patientId: string,
+    doctorInputData: any,
+  ): Promise<any> {
+    try {
+      // Fetch the patient profile from the profiles table using patient_id
       const { data: profileData, error: profileError } =
         await this.supabaseService
           .getClient()
@@ -20,38 +49,16 @@ export class PatientService {
         throw new Error(`Error fetching profile data: ${profileError.message}`);
       }
 
-      // Fetch data from patient_inputs table
-      const { data: patientInputsData, error: patientInputsError } =
-        await this.supabaseService
-          .getClient()
-          .from('patient_inputs')
-          .select('phone_number, age, gender')
-          .eq('patient_id', patientId)
-          .single();
+      // Fetch the existing patient inputs from the patient_inputs table using patient_id
+      const patientInputsData =
+        await this.supabaseService.fetchUserInputsByPatientId(patientId);
 
-      if (patientInputsError) {
-        throw new Error(
-          `Error fetching patient inputs: ${patientInputsError.message}`,
-        );
+      if (!patientInputsData) {
+        console.error('No patient inputs data found.');
       }
 
-      // Fetch data from doctor_inputs table
-      const { data: doctorInputsData, error: doctorInputsError } =
-        await this.supabaseService
-          .getClient()
-          .from('doctor_inputs')
-          .select('medical_condition, disability_level')
-          .eq('patient_id', patientId)
-          .single();
-
-      if (doctorInputsError) {
-        throw new Error(
-          `Error fetching doctor inputs: ${doctorInputsError.message}`,
-        );
-      }
-
-      // Check if data exists in all three tables before creating a display record
-      if (profileData && patientInputsData && doctorInputsData) {
+      // Ensure that all required data exists
+      if (profileData && patientInputsData && doctorInputData) {
         const newDisplayRecord = {
           patient_id: profileData.id,
           full_name: profileData.full_name,
@@ -59,13 +66,11 @@ export class PatientService {
           phone_number: patientInputsData.phone_number,
           age: patientInputsData.age,
           gender: patientInputsData.gender,
-          medical_condition: doctorInputsData.medical_condition,
-          disability_level: doctorInputsData.disability_level,
-          created_at: new Date(),
-          updated_at: new Date(),
+          medical_condition: doctorInputData.medical_condition, // Use doctorInputData directly
+          disability_level: doctorInputData.disability_level, // Use doctorInputData directly
         };
 
-        // Insert the new record into the patient_display table
+        // Insert the new display record into the patient_display table
         const { error: insertError } = await this.supabaseService
           .getClient()
           .from('patient_display')
@@ -88,6 +93,7 @@ export class PatientService {
         };
       }
     } catch (error) {
+      console.log(error.message);
       throw new Error(
         `Failed to add patient to display table: ${error.message}`,
       );

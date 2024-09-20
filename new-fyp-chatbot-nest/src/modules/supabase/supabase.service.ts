@@ -316,25 +316,6 @@ export class SupabaseService {
     }
   }
 
-  async addNewPatient(doctorInputData: any) {
-    try {
-      // Insert into doctor_inputs table
-      const { error: insertError } = await this.supabase
-        .from('doctor_inputs')
-        .insert([doctorInputData]);
-
-      if (insertError) {
-        throw new Error(
-          `Error inserting into doctor_inputs: ${insertError.message}`,
-        );
-      }
-
-      return { success: true, message: 'Patient added successfully' };
-    } catch (error) {
-      throw new Error(`Failed to add new patient: ${error.message}`);
-    }
-  }
-
   async getPatientNames() {
     try {
       const { data, error } = await this.supabase
@@ -349,6 +330,26 @@ export class SupabaseService {
       return data; // Return the array of patients
     } catch (error) {
       console.error('Error fetching patient names:', error.message);
+      throw error;
+    }
+  }
+
+  async getPatientDisplayList() {
+    try {
+      const { data, error } = await this.supabase
+        .from('patient_display')
+        .select('*')
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        throw new Error(
+          `Error fetching patient display list: ${error.message}`,
+        );
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getPatientDisplayList:', error);
       throw error;
     }
   }
