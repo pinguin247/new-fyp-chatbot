@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash, Search } from "lucide-react";
-import { AgGridReact } from "ag-grid-react"; // React Data Grid Component
-import "ag-grid-community/styles/ag-grid.css"; // Mandatory CSS required by the Data Grid
-import "ag-grid-community/styles/ag-theme-quartz.css"; // Optional Theme applied to the Data Grid
+import { AgGridReact } from "ag-grid-react";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-function PatientListTable() {
+function PatientListTable({ reload, setReload }) {
   const pagination = true;
   const paginationPageSize = 10;
   const paginationPageSizeSelector = [25, 50, 100];
@@ -26,9 +26,7 @@ function PatientListTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchInput, setSearchInput] = useState("");
-  const [reload, setReload] = useState(false); // State to trigger data reload
 
-  // Custom buttons for the delete action
   const CustomButtons = (props) => {
     return (
       <AlertDialog>
@@ -49,9 +47,8 @@ function PatientListTable() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                // Logic to delete a patient here
                 toast("Patient Deleted Successfully");
-                setReload(true); // Set reload to true to trigger re-fetch after deletion
+                setReload(true);
               }}
             >
               Continue
@@ -62,23 +59,21 @@ function PatientListTable() {
     );
   };
 
-  // Column Definitions
   const [colDefs, setColDefs] = useState([
-    { field: "full_name", headerName: "Name", filter: true }, // Use 'full_name' instead of 'name'
+    { field: "full_name", headerName: "Name", filter: true },
     { field: "email", headerName: "Email", filter: true },
-    { field: "phone_number", headerName: "Phone Number", filter: true }, // Use 'phone_number' instead of 'phoneNumber'
+    { field: "phone_number", headerName: "Phone Number", filter: true },
     { field: "age", headerName: "Age", filter: true },
     { field: "gender", headerName: "Gender", filter: true },
     {
       field: "medical_condition",
       headerName: "Medical Condition",
       filter: true,
-    }, // Use 'medical_condition' instead of 'medicalCondition'
-    { field: "disability_level", headerName: "Disability Level", filter: true }, // Use 'disability_level' instead of 'disabilityLevel'
+    },
+    { field: "disability_level", headerName: "Disability Level", filter: true },
     { field: "action", headerName: "Action", cellRenderer: CustomButtons },
   ]);
 
-  // Fetch data from the API
   const fetchPatients = async () => {
     try {
       const response = await fetch(
@@ -98,11 +93,10 @@ function PatientListTable() {
     }
   };
 
-  // Trigger fetch when component mounts or when reload is true
   useEffect(() => {
     setLoading(true);
     fetchPatients();
-    setReload(false); // Reset reload to false after re-fetch
+    setReload(false); // Reset reload after fetching data
   }, [reload]);
 
   return (
@@ -112,10 +106,7 @@ function PatientListTable() {
       ) : error ? (
         <p>Error: {error}</p>
       ) : (
-        <div
-          className="ag-theme-quartz" // applying the Data Grid theme
-          style={{ height: 500 }} // the Data Grid will fill the size of the parent container
-        >
+        <div className="ag-theme-quartz" style={{ height: 500 }}>
           <div className="flex justify-start" style={{ marginBottom: 15 }}>
             <div
               className="p-2 rounded-lg border shadow-sm flex items-center gap-2"
@@ -125,7 +116,7 @@ function PatientListTable() {
               <input
                 type="text"
                 placeholder="Search Patients"
-                className="bg-white outline-none w-full p-1 focus:outline-none"
+                className="bg-white outline-none w-full p-1"
                 onChange={(event) => setSearchInput(event.target.value)}
               />
             </div>

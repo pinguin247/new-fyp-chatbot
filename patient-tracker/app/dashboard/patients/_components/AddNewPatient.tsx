@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { toast } from "sonner";
 import FileUpload from "./FileUpload";
-import { PaintBucket } from "lucide-react";
 
 type Inputs = {
   patientId: string;
@@ -26,7 +25,11 @@ type Inputs = {
   disability_level: string;
 };
 
-function AddNewPatient() {
+type AddNewPatientProps = {
+  onPatientAdded: () => void; // Callback to refresh data after adding a new patient
+};
+
+function AddNewPatient({ onPatientAdded }: AddNewPatientProps) {
   const [open, setOpen] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -133,6 +136,7 @@ function AddNewPatient() {
           toast.error("Failed to parse and upload files.");
         }
       }
+      onPatientAdded();
 
       setOpen(false);
     } catch (error) {
