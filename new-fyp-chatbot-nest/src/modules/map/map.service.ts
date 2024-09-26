@@ -13,6 +13,7 @@ interface UserSession {
   persuasionAttempt: number;
   current_exercise: string;
   failedPersuasionCount: number;
+  first_time: boolean; // Add first_time field
 }
 
 @Injectable()
@@ -54,6 +55,7 @@ export class MapService {
       persuasionAttempt: 0,
       current_exercise: exercise,
       failedPersuasionCount: 0,
+      first_time: true,
     };
 
     try {
@@ -68,6 +70,7 @@ export class MapService {
         persuasion_attempt: 0,
         current_exercise: exercise,
         failed_persuasion_count: 0,
+        first_time: true,
       });
     } catch (error) {
       console.error('Error creating session in Supabase:', error);
@@ -101,6 +104,7 @@ export class MapService {
           persuasionAttempt: data.persuasion_attempt || 0,
           current_exercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
+          first_time: data.first_time !== undefined ? data.first_time : true, // Fetch first_time, default to true if not set
         };
         console.log(`Loaded session for userId: ${userId}`);
         return this.users[userId];
@@ -109,6 +113,22 @@ export class MapService {
     } catch (error) {
       console.error('Error loading session from Supabase:', error);
       return null;
+    }
+  }
+
+  async updateFirstTime(userId: string, isFirstTime: boolean) {
+    const userSession = this.getSession(userId);
+    if (userSession) {
+      userSession.first_time = isFirstTime;
+
+      try {
+        await this.supabaseService.updateSessionData(userId, {
+          first_time: isFirstTime,
+        });
+        console.log(`Successfully updated first_time for user ${userId}`);
+      } catch (error) {
+        console.error('Error updating first_time in Supabase:', error);
+      }
     }
   }
 

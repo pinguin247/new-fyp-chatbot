@@ -1,4 +1,4 @@
-rootProject.name = 'FitTrackSG'
+rootProject.name = 'FitBuddySG'
 
 dependencyResolutionManagement {
   versionCatalogs {
