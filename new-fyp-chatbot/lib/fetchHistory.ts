@@ -1,6 +1,9 @@
 export const fetchHistory = async (userId: string) => {
   console.log('Fetching chat history for userId:', userId);
-  console.log('Endpoint:', `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/history`);
+  console.log(
+    'Endpoint:',
+    `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/chat/history`,
+  );
 
   try {
     const response = await fetch(

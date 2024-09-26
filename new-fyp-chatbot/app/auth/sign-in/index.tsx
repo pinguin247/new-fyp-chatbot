@@ -4,17 +4,13 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
+  //Image,
   ToastAndroid,
 } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  GoogleSignin,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 import { supabase } from '../../../lib/supabase';
 
 export default function SignIn() {
@@ -22,80 +18,6 @@ export default function SignIn() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-
-  GoogleSignin.configure({
-    webClientId:
-      '256328138389-k6qq5pjcrapmm5u0smkr0gf1tllvuemq.apps.googleusercontent.com',
-  });
-
-  async function onGoogleButtonPress() {
-    try {
-      // Ensure the account chooser appears
-      await GoogleSignin.signOut();
-
-      // Check if your device supports Google Play
-      await GoogleSignin.hasPlayServices({
-        showPlayServicesUpdateDialog: true,
-      });
-
-      const userInfo = await GoogleSignin.signIn();
-      if (userInfo.idToken) {
-        // Attempt to sign in with Google ID token
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: userInfo.idToken,
-        });
-
-        if (error) {
-          if (error.message.includes('already registered')) {
-            // If user is already registered, log them in
-            const { data: signInData, error: signInError } =
-              await supabase.auth.signInWithIdToken({
-                provider: 'google',
-                token: userInfo.idToken,
-              });
-
-            if (signInError) {
-              console.error(signInError);
-              ToastAndroid.show(
-                'Failed to sign in with Google',
-                ToastAndroid.LONG,
-              );
-            } else {
-              console.log('User logged in:', signInData);
-              router.replace('/home'); // Navigate to home
-            }
-          } else {
-            console.error(error);
-            ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-          }
-        } else {
-          // New user or existing user successfully signed in
-          console.log('User signed in or up:', data);
-          router.replace('/home'); // Navigate to home
-        }
-      } else {
-        throw new Error('No ID token present!');
-      }
-    } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.error(error);
-        ToastAndroid.show('Google Sign-In cancelled', ToastAndroid.LONG);
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        console.error(error);
-        ToastAndroid.show('Google Sign-In in progress', ToastAndroid.LONG);
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        console.error(error);
-        ToastAndroid.show(
-          'Google Play services not available',
-          ToastAndroid.LONG,
-        );
-      } else {
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-      }
-    }
-  }
 
   useEffect(() => {
     navigation.setOptions({
@@ -200,7 +122,8 @@ export default function SignIn() {
         <View style={styles.separatorLine} />
       </View>
 
-      <TouchableOpacity
+      {/* Temporarily disable Google Sign-In button and functionality */}
+      {/* <TouchableOpacity
         style={styles.googleButton}
         onPress={onGoogleButtonPress}
       >
@@ -209,7 +132,7 @@ export default function SignIn() {
           style={styles.googleLogo}
         />
         <Text style={styles.googleButtonText}>Google</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Don't have an account? </Text>

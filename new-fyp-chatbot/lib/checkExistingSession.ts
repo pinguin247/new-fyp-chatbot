@@ -3,7 +3,7 @@ export const checkExistingSession = async (
 ): Promise<boolean> => {
   try {
     const response = await fetch(
-      `http://10.0.2.2:3000/map/check-session/${userId}`,
+      `http://${process.env.EXPO_PUBLIC_MY_ENDPOINT}/map/check-session/${userId}`,
     );
     const data = await response.json();
 

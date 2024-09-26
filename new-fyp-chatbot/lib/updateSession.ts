@@ -5,7 +5,7 @@ export const updateSession = async (
 ) => {
   try {
     const response = await fetch(
-      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/updateSession`,
+      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/chat/updateSession`,
       {
         method: 'POST', // Assuming your backend accepts POST requests for updates
         headers: {

@@ -4,17 +4,13 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
+  //Image,
   ToastAndroid,
 } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useNavigation, Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  GoogleSignin,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 import { supabase } from '../../../lib/supabase';
 
 export default function SignUp() {
@@ -22,50 +18,7 @@ export default function SignUp() {
   const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [fullName, setfullName] = useState<string>('');
-
-  GoogleSignin.configure({
-    webClientId:
-      '256328138389-k6qq5pjcrapmm5u0smkr0gf1tllvuemq.apps.googleusercontent.com',
-  });
-
-  async function onGoogleButtonPress() {
-    try {
-      // Ensure the account chooser appears
-      await GoogleSignin.signOut();
-
-      const userInfo = await GoogleSignin.signIn();
-      console.log(JSON.stringify(userInfo, null, 2));
-      if (userInfo.idToken) {
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'google',
-          token: userInfo.idToken,
-        });
-        console.log(error, data);
-      } else {
-        throw new Error('no ID token present!');
-      }
-      router.replace('/home'); // Navigate to home
-    } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // user cancelled the login flow
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        // operation (e.g. sign in) is in progress already
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        // play services not available or outdated
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-      } else {
-        // some other error happened
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
-      }
-    }
-  }
+  const [fullName, setFullName] = useState<string>('');
 
   useEffect(() => {
     navigation.setOptions({
@@ -136,7 +89,7 @@ export default function SignUp() {
           placeholder="Full name"
           placeholderTextColor={Colors.GRAY}
           value={fullName}
-          onChangeText={setfullName}
+          onChangeText={setFullName}
           autoCapitalize="none"
         />
       </View>
@@ -195,7 +148,8 @@ export default function SignUp() {
         <View style={styles.separatorLine} />
       </View>
 
-      <TouchableOpacity
+      {/* Temporarily disable Google Sign-In button and functionality */}
+      {/* <TouchableOpacity
         style={styles.googleButton}
         onPress={onGoogleButtonPress}
       >
@@ -204,7 +158,7 @@ export default function SignUp() {
           style={styles.googleLogo}
         />
         <Text style={styles.googleButtonText}>Google</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Already have an account? </Text>
