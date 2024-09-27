@@ -1,7 +1,7 @@
 export const createSession = async (userId: string, exerciseId: string) => {
   try {
     const response = await fetch(
-      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/createSession`,
+      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/chat/createSession`,
       {
         method: 'POST',
         headers: {
