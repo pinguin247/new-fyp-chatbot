@@ -11,13 +11,14 @@ const Header: React.FC = () => (
       paddingHorizontal: 5,
       flexDirection: 'row',
       alignItems: 'center',
+      marginTop: '15%',
       justifyContent: 'space-between',
-      flex: 1,
+      height: 70, // Explicitly set height to control the size
     }}
   >
-    <ImageContainer image={headerImage} />
+    <ImageContainer image={headerImage} height={50} width={50} />
     <HeaderTitle />
-    <ImageContainer image={notification} style={{ flex: 0.5 }} />
+    <ImageContainer image={notification} height={30} width={30} />
   </View>
 );
 

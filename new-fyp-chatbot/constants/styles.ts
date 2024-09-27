@@ -10,9 +10,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   screen: {
-    marginHorizontal: '3%',
-    flex: 1,
+    marginHorizontal: '1%',
     paddingHorizontal: 20, // Adjust as per your layout needs
+    flexShrink: 1, // Add flexShrink to reduce height if needed
+    marginTop: '5%',
   },
   rowLabel: {
     flexDirection: 'row',
@@ -73,10 +74,10 @@ const styles = StyleSheet.create({
   },
   model: {
     position: 'absolute',
-    right: 0,
+    right: 20,
     bottom: 0,
     zIndex: 10,
-    height: '75%',
+    height: '50%',
     width: '50%',
     transform: [{ rotateY: '180deg' }],
   },
