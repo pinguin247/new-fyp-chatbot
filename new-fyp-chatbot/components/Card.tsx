@@ -9,9 +9,6 @@ interface CardProps {
 }
 
 const Card: React.FC<CardProps> = ({ data, index }) => {
-  // Add logging to check if data.image is valid
-  console.log('Image Source: ', data.image);
-
   return (
     <View
       style={{
