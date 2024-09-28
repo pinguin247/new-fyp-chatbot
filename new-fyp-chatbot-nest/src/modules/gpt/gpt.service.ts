@@ -126,17 +126,6 @@ export class ChatService {
         const botMessage =
           await this.generateGPTResponsewithChatHistory(prompt);
 
-        // Save the assistant's message to Supabase
-        this.conversationHistory.push({
-          role: 'assistant',
-          content: botMessage,
-        });
-        await this.supabaseService.insertChatHistory(
-          userId,
-          'assistant',
-          botMessage,
-        );
-
         // Return the generated response
         return { response: botMessage };
       }
@@ -156,7 +145,7 @@ export class ChatService {
 
       // Determine user's motivation level
 
-      const x_m = this.determineUserMotivation(content);
+      const x_m = await this.determineUserMotivation(content);
 
       console.log(`Determined motivation: ${x_m}`);
 
@@ -370,42 +359,46 @@ export class ChatService {
   }
 
   // Determine user's motivation from response
-  determineUserMotivation(response: string): number {
-    const positiveKeywords = [
-      'yes',
-      'sure',
-      'okay',
-      'great',
-      'awesome',
-      'sounds good',
-      "let's do it",
-    ];
-    const negativeKeywords = [
-      'no',
-      'not interested',
-      'maybe later',
-      "don't want to",
-      "I'm too busy",
-      "I don't want to exercise alone",
-    ];
+  async determineUserMotivation(response: string): Promise<number> {
+    console.log('Determining user motivation based on response using GPT...');
 
-    if (
-      positiveKeywords.some((keyword) =>
-        response.toLowerCase().includes(keyword),
-      )
-    ) {
-      return 1; // High motivation
+    // Create a refined prompt for GPT to classify motivation correctly
+    const prompt = `The user has provided the following response: "${response}". 
+  Based on this input, return the user's motivation level as a number: 
+  1 for High Motivation, 0 for Low Motivation, or 0.5 for Neutral Motivation.
+  
+  Here are examples of responses and how they should be categorized:
+  - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
+  - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
+  - Neutral Motivation (0.5): "meh", "maybe", "not sure", "I guess"
+
+  Please respond only with the number.`;
+
+    try {
+      // Send the refined prompt to GPT
+      const chatCompletion = await this.openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: prompt },
+        ],
+      });
+
+      // Parse GPT's response and convert to a number
+      const motivation = parseFloat(
+        chatCompletion.choices[0].message.content.trim(),
+      );
+
+      // Return the parsed number, ensure it's one of the expected values
+      if (motivation === 1 || motivation === 0 || motivation === 0.5) {
+        return motivation;
+      } else {
+        throw new Error('Unexpected value returned from GPT.');
+      }
+    } catch (error) {
+      console.error('Error determining motivation using GPT:', error);
+      throw new Error('Failed to determine user motivation.');
     }
-
-    if (
-      negativeKeywords.some((keyword) =>
-        response.toLowerCase().includes(keyword),
-      )
-    ) {
-      return 0; // Low motivation
-    }
-
-    return 0.5; // Neutral motivation
   }
 
   async fetchChatHistory(userId: string) {
