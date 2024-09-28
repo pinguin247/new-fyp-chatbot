@@ -6,7 +6,7 @@ export const saveMessage = async (
   console.log('Saving bot message for userId:', userId);
   try {
     const response = await fetch(
-      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/saveMessage`,
+      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/chat/saveMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

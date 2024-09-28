@@ -1,6 +1,8 @@
 export const fetchRandomExercise = async () => {
   try {
-    const response = await fetch('http://10.0.2.2:3000/exercise/random');
+    const response = await fetch(
+      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/exercise/random`,
+    );
     if (!response.ok) {
       throw new Error('Failed to fetch exercise');
     }

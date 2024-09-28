@@ -109,7 +109,6 @@ export class SupabaseService {
       throw error; // Re-throw the error to be caught in the controller
     }
   }
-
   async fetchChatHistory(userId: string): Promise<any[]> {
     try {
       // Check if the profile exists
@@ -120,8 +119,11 @@ export class SupabaseService {
         .single();
 
       if (profileError || !profile) {
+        console.error(`Error fetching profile: ${profileError?.message}`);
         throw new Error(`Profile with user ID ${userId} does not exist.`);
       }
+
+      console.log('Profile fetched:', profile);
 
       // Fetch chat history for the correct profile id
       const { data, error } = await this.supabase
@@ -131,8 +133,11 @@ export class SupabaseService {
         .order('created_at', { ascending: true });
 
       if (error) {
+        console.error('Error fetching chat history:', error.message);
         throw new Error(`Failed to fetch chat history: ${error.message}`);
       }
+
+      console.log('Chat history fetched:', data);
 
       return data;
     } catch (error) {

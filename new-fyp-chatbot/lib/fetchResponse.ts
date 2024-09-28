@@ -1,7 +1,7 @@
 export const fetchResponse = async (userId: string, content: string) => {
   try {
     const response = await fetch(
-      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/message`,
+      `${process.env.EXPO_PUBLIC_MY_ENDPOINT}/chat/message`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
