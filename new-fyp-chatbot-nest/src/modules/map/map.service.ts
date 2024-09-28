@@ -306,13 +306,43 @@ export class MapService {
 
   async updateStrategyWeights(userId: string, successful: boolean) {
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c >= 0.5;
 
     console.log(`\n--- Updating Strategy Weights ---`);
     console.log(`User ID: ${userId}`);
-    console.log(`Persuasion Successful: ${successful}`);
-    console.log(`Current Route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
 
+    // Check if this is the first-time response
+    if (userSession.first_time) {
+      console.log("It's the user's first time. Only updating y_c and y_p.");
+
+      // Update only y_c and y_p based on success
+      if (successful) {
+        userSession.y_c = 1;
+        userSession.y_p = 0;
+      }
+      // Ensure y_c and y_p are within valid bounds
+      userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
+      userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
+
+      // Update session data in Supabase without updating strategy weights
+      try {
+        await this.supabaseService.updateSessionData(userId, {
+          y_c: userSession.y_c,
+          y_p: userSession.y_p,
+        });
+        console.log(
+          `Successfully updated y_c and y_p in Supabase for first time.`,
+        );
+      } catch (error) {
+        console.error('Error updating y_c and y_p in Supabase:', error);
+      }
+
+      return; // Skip updating strategy weights if it's the first time
+    }
+
+    console.log(`Persuasion Successful: ${successful}`);
+    const isCentralRoute = userSession.y_c >= 0.5;
+
+    // Proceed to update strategy weights for subsequent attempts
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;

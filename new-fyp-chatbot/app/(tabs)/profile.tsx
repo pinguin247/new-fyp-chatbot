@@ -121,9 +121,7 @@ export default function Profile({ session }: { session: Session }) {
         updated_at: new Date(),
       };
 
-      const { error, data } = await supabase
-        .from('patient_inputs')
-        .insert(newRecord);
+      const { error } = await supabase.from('patient_inputs').insert(newRecord);
 
       if (error) {
         console.error('Error inserting data:', error);
