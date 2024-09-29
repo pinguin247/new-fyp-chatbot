@@ -279,13 +279,15 @@ export class MapService {
     const strategies = isCentralRoute
       ? centralStrategies
       : peripheralStrategies;
+    const selectedStrategies = isCentralRoute
+      ? userSession.selectedStrategies.central
+      : userSession.selectedStrategies.peripheral;
+
     let strategyIndex = userSession.strategyIndexChosen;
 
-    // Ensure the strategyIndex is within bounds of the current route's strategies
-    if (isCentralRoute) {
-      strategyIndex = strategyIndex % centralStrategies.length;
-    } else {
-      strategyIndex = strategyIndex % peripheralStrategies.length;
+    // Check if the selected strategy is still eligible, otherwise find the next eligible one
+    while (selectedStrategies[strategyIndex] === 0) {
+      strategyIndex = (strategyIndex + 1) % strategies.length;
     }
 
     console.log(`Strategy Index: ${strategyIndex}`);
@@ -301,10 +303,20 @@ export class MapService {
       `Updated specific strategy index: ${userSession.specificStrategyIndex}`,
     );
 
+    // Update strategyIndexChosen in session
+    userSession.strategyIndexChosen = strategyIndex;
+
     return chosenStrategy;
   }
 
-  async updateStrategyWeights(userId: string, successful: boolean) {
+  async updateStrategyWeights(userId: string, successful: number) {
+    let isMotivated;
+
+    if (successful == 1) {
+      isMotivated = true;
+    } else {
+      isMotivated = false;
+    }
     const userSession = this.users[userId];
 
     console.log(`\n--- Updating Strategy Weights ---`);
@@ -315,7 +327,7 @@ export class MapService {
       console.log("It's the user's first time. Only updating y_c and y_p.");
 
       // Update only y_c and y_p based on success
-      if (successful) {
+      if (isMotivated) {
         userSession.y_c = 1;
         userSession.y_p = 0;
       }
@@ -339,7 +351,7 @@ export class MapService {
       return; // Skip updating strategy weights if it's the first time
     }
 
-    console.log(`Persuasion Successful: ${successful}`);
+    //console.log(`Persuasion Successful: ${successful}`);
     const isCentralRoute = userSession.y_c >= 0.5;
 
     // Proceed to update strategy weights for subsequent attempts
@@ -369,7 +381,7 @@ export class MapService {
     );
 
     if (isCentralRoute) {
-      if (successful) {
+      if (isMotivated) {
         userSession.y_c += 0.2;
         userSession.y_p -= 0.2;
       } else {
@@ -377,7 +389,7 @@ export class MapService {
         userSession.y_p += 0.1;
       }
     } else {
-      if (successful) {
+      if (isMotivated) {
         userSession.y_c -= 0.2;
         userSession.y_p += 0.2;
       } else {

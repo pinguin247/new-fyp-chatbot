@@ -91,6 +91,19 @@ export class ChatService {
         }
       }
 
+      // Fetch patient details for personalization
+
+      const patientDetails =
+        await this.supabaseService.fetchUserInputsByPatientId(userId);
+
+      //Fetch Doctor Inputs
+
+      const doctorInput =
+        await this.patientService.getDoctorInputsByPatientId(userId);
+
+      // Extract the current exercise from the session
+      const currentExercise = userSession?.current_exercise || 'exercise';
+
       // Check if it's the user's first message
       // Check if it's the user's first message
       if (userSession.first_time) {
@@ -101,24 +114,28 @@ export class ChatService {
           await this.determineUserMotivationFromGPT(content);
         console.log('Motivation determined by GPT:', motivationResult);
 
-        // Determine motivation status
-        const IsMotivated = motivationResult === 'High Motivation';
-
         // Update the strategy parameters in the session
-        await this.mapService.updateStrategyWeights(userId, IsMotivated);
+        await this.mapService.updateStrategyWeights(userId, motivationResult);
 
         // Update the session to set first_time to false
         await this.mapService.updateFirstTime(userId, false);
 
-        // Extract the current exercise from the session
-        const currentExercise = userSession?.current_exercise || 'exercise';
+        const strategy = this.mapService.getCurrentStrategy(userId);
+        const strategyExamples =
+          await this.supabaseService.fetchExamplesByStrategy(strategy);
+
+        if (!strategyExamples || strategyExamples.length === 0) {
+          throw new Error(`No examples found for strategy: ${strategy}`);
+        }
+        const strategyExampleText = strategyExamples.join(' ');
 
         let prompt;
-        if (IsMotivated) {
-          prompt = `The user responded to previous message with: "${content}", Respond with a concise, motivational message to recommend the following exercise: ${currentExercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. Try to address what they are feeling. At the end, ask user if they are interested and you will allocate a time for them and send them resources to guide them through the exercise.`;
+        if (motivationResult === 1) {
+          prompt = `The user responded to the previous message with: "${content}". The user is feeling motivated. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise.`;
         } else {
-          prompt = `The user responded to previous message with: "${content}", Respond with a concise, motivational message to recommend the following exercise: ${currentExercise}. Offer some additional support to motivate them and encourage them to do the exercise. Try to address what they are feeling. At the end, ask user if they are interested and you will allocate a time for them and send them resources to guide them through the exercise.`;
+          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise.`;
         }
+
         // Log the prompt that will be sent to GPT
         console.log('Sending the following prompt to GPT API:', prompt);
 
@@ -132,16 +149,6 @@ export class ChatService {
 
       // For subsequent messages, use the existing flow
       console.log('Handling subsequent user message...');
-
-      // Fetch patient details for personalization
-
-      const patientDetails =
-        await this.supabaseService.fetchUserInputsByPatientId(userId);
-
-      //Fetch Doctor Inputs
-
-      const doctorInput =
-        await this.patientService.getDoctorInputsByPatientId(userId);
 
       // Determine user's motivation level
 
@@ -159,10 +166,8 @@ export class ChatService {
         userId,
         x_m,
       );
+      await this.mapService.updateStrategyWeights(userId, x_m);
       const strategy = this.mapService.getCurrentStrategy(userId);
-      await this.mapService.updateStrategyWeights(userId, false);
-
-      // Fetch examples based on the selected strategy (returns an array of examples)
       const strategyExamples =
         await this.supabaseService.fetchExamplesByStrategy(strategy);
 
@@ -170,7 +175,10 @@ export class ChatService {
         throw new Error(`No examples found for strategy: ${strategy}`);
       }
       const strategyExampleText = strategyExamples.join(' ');
-      const currentExercise = userSession?.current_exercise || 'exercise';
+
+      const conversationHistory =
+        await this.supabaseService.fetchChatHistory(userId);
+
       const prompt = this.generatePrompt(
         route,
         strategy,
@@ -179,6 +187,7 @@ export class ChatService {
         patientDetails,
         doctorInput,
         content,
+        conversationHistory,
       );
 
       // Log the prompt that will be sent to the API
@@ -223,7 +232,7 @@ export class ChatService {
     );
 
     // Update the strategy weights to reflect the successful persuasion
-    await this.mapService.updateStrategyWeights(userId, true);
+    await this.mapService.updateStrategyWeights(userId, 1);
 
     return { response: confirmationMessage };
   }
@@ -272,13 +281,16 @@ export class ChatService {
       const doctorInput =
         await this.patientService.getDoctorInputsByPatientId(userId);
 
+      const conversationHistory =
+        await this.supabaseService.fetchChatHistory(userId);
       // Generate a dynamic and persuasive prompt with the new exercise
-      const prompt = this.generateDynamicPromptWithNewExercise(
+      const prompt = this.generatePromptWithNewExercise(
         strategy,
         strategyExamples,
         newExercise.name, // Use the new exercise here
         patientDetails,
         doctorInput,
+        conversationHistory,
       );
 
       console.log(`Generated prompt for 3rd attempt: ${prompt}`);
@@ -420,6 +432,7 @@ export class ChatService {
     patientDetails: any, // Include patient details
     doctorInputs: any,
     lastUserResponse: string,
+    conversationHistory: { role: 'user' | 'assistant'; content: string }[], // Pass conversation history
   ): string {
     // Extract patient details like age, gender for personalization
     const { age, gender } = patientDetails || {
@@ -432,24 +445,35 @@ export class ChatService {
       disability_level: 'unknown',
     };
 
-    // Add the strategy examples, exercise, and patient details to the prompt
+    // Start creating the prompt with the chat history context
+    let historyPrompt = 'Here is the chat history:\n';
+
+    // Append the conversation history
+    conversationHistory.forEach((message) => {
+      historyPrompt += `${message.role === 'user' ? 'User' : 'Assistant'}: ${
+        message.content
+      }\n`;
+    });
+
+    // Add current context for the new prompt
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
+
     if (route === 'central') {
-      return `The user responded with: "${lastUserResponse}". For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     } else {
-      return `The user responded with: "${lastUserResponse}". For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     }
+
+    return historyPrompt;
   }
-  generateDynamicPromptWithNewExercise(
+  generatePromptWithNewExercise(
     strategy: string,
     strategyExamples: string[],
     newExercise: string,
     patientDetails: any,
     doctorInputs: any,
+    conversationHistory: any,
   ): string {
-    const lastUserResponse =
-      this.conversationHistory.reverse().find((msg) => msg.role === 'user')
-        ?.content || '';
-
     // Extract patient details like age, gender for personalization
     const { age, gender } = patientDetails || {
       age: 'unknown',
@@ -461,15 +485,33 @@ export class ChatService {
       disability_level: 'unknown',
     };
 
+    // Start creating the prompt with the chat history context
+    let historyPrompt = 'Here is the chat history:\n';
+
+    // Append the conversation history
+    conversationHistory.forEach((message) => {
+      historyPrompt += `${message.role === 'user' ? 'User' : 'Assistant'}: ${
+        message.content
+      }\n`;
+    });
+
+    // Add the last user response from the history
+    const lastUserResponse =
+      conversationHistory.reverse().find((msg) => msg.role === 'user')
+        ?.content || '';
+
     // Randomly select a strategy example as a reference
     const exampleToUse =
       strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
 
-    // Use the new exercise and strategy example in the prompt
-    return `The user responded with: "${lastUserResponse}". For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+    // Complete the prompt using the strategy example and new exercise
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
+    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+
+    return historyPrompt;
   }
 
-  async updateStrategyWeights(userId: string, successful: boolean) {
+  async updateStrategyWeights(userId: string, successful: number) {
     console.log(
       `Updating strategy weights for user ${userId}. Success: ${successful}`,
     );
@@ -478,23 +520,46 @@ export class ChatService {
 
   private async determineUserMotivationFromGPT(
     content: string,
-  ): Promise<string> {
-    console.log('Determining user motivation for the first message...');
-    const motivationPrompt = `The user has provided the following input: "${content}". Based on this input, determine if the user's motivation is "High Motivation" or "Low Motivation". Please respond with only one of these two options.`;
+  ): Promise<number> {
+    console.log('Determining user motivation based on mood...');
+
+    // Update the prompt to make sure GPT understands the context of the first message
+    const motivationPrompt = `The user received the following message: "Hi! How are you feeling today? Let me know, and I can help you with your exercise routine!".
+    The user then responded with: "${content}". Based on this input, determine the user's motivation level.
+  
+    Please return the motivation level as:
+    - 1 for High Motivation (feeling positive or energetic)
+    - 0 for Low Motivation (feeling negative or uninterested).
+  
+    Here are examples for mood-related responses:
+    - High Motivation (1): "I'm great", "feeling awesome", "ready to go", "let's do this", "energetic", "motivated"
+    - Low Motivation (0): "I'm tired", "not feeling it", "meh", "I'm okay", "could be better", "not today", "feeling down".
+  
+    Only respond with the number 1 or 0.`;
 
     try {
+      // Send the updated prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant' },
+          { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: motivationPrompt },
         ],
       });
 
-      const motivation = chatCompletion.choices[0].message.content.trim();
-      return motivation.includes('High Motivation')
-        ? 'High Motivation'
-        : 'Low Motivation';
+      // Parse GPT's response, which should be either "1" or "0"
+      const motivationResponse =
+        chatCompletion.choices[0].message.content.trim();
+
+      // Convert the response to a number and return it
+      const motivation = parseInt(motivationResponse, 10);
+
+      // Ensure the motivation is either 1 or 0
+      if (motivation === 1 || motivation === 0) {
+        return motivation;
+      } else {
+        throw new Error('Unexpected value returned from GPT.');
+      }
     } catch (error) {
       console.error('Error determining motivation with GPT:', error);
       throw new Error('Error determining user motivation.');
