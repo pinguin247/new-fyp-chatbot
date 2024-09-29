@@ -53,7 +53,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'Settings',
           tabBarIcon: ({ color }) => (
             <Image
               source={profile}
