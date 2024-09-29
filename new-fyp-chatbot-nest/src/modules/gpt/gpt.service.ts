@@ -157,7 +157,7 @@ export class ChatService {
       console.log(`Determined motivation: ${x_m}`);
 
       if (x_m === 1) {
-        return this.handlePersuasionSuccess(userId);
+        return this.handlePersuasionSuccess(userId, currentExercise);
       }
 
       await this.mapService.incrementFailedPersuasionCount(userId);
@@ -216,25 +216,33 @@ export class ChatService {
   }
 
   // When the user is already motivated
-  private async handlePersuasionSuccess(userId: string) {
-    const confirmationMessage =
-      "Great! I'm glad you're willing to try the exercise. Keep it up!";
+  private async handlePersuasionSuccess(
+    userId: string,
+    currentExercise: string,
+  ) {
+    // Create a prompt for GPT to generate a thank you message with resources
+    const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement and provide links or resources that would help them complete the exercise effectively. (at most 2 paras)`;
+
+    // Get the GPT response for the personalized message
+    const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
+
+    // Add the GPT response to the conversation history
     this.conversationHistory.push({
       role: 'assistant',
-      content: confirmationMessage,
+      content: gptResponse,
     });
 
-    // Save confirmation message to Supabase
+    // Save the GPT response in Supabase
     await this.supabaseService.insertChatHistory(
       userId,
       'assistant',
-      confirmationMessage,
+      gptResponse,
     );
 
     // Update the strategy weights to reflect the successful persuasion
     await this.mapService.updateStrategyWeights(userId, 1);
 
-    return { response: confirmationMessage };
+    return { response: gptResponse };
   }
 
   // Handle persuasion logic for 3 and 6 attempts

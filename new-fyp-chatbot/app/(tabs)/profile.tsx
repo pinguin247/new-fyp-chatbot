@@ -4,10 +4,10 @@ import { Button, Input } from '@rneui/themed';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../lib/supabase';
 import { fetchUserProfile } from '../../lib/fetchUserProfile'; // Import the new service
-import { Session } from '@supabase/supabase-js';
+
 import { router } from 'expo-router';
 
-export default function Profile({ session }: { session: Session }) {
+export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [username, setUsername] = useState('');
@@ -17,7 +17,6 @@ export default function Profile({ session }: { session: Session }) {
   // Personal details fields for the modal
   const [age, setAge] = useState(18); // Default age set to 18
   const [phoneNumber, setPhoneNumber] = useState(''); // New phone number field
-  const [country, setCountry] = useState(''); // New country field
   const [gender, setGender] = useState('Male');
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -109,7 +108,6 @@ export default function Profile({ session }: { session: Session }) {
         patient_id: profileId, // Use the stored profile ID as the foreign key
         age: age, // Age as a number
         phone_number: phoneNumber, // New phone number field
-        country: country, // New country field
         gender: gender, // Gender value
         created_at: new Date(),
         updated_at: new Date(),
@@ -221,11 +219,6 @@ export default function Profile({ session }: { session: Session }) {
               value={phoneNumber}
               onChangeText={(text) => setPhoneNumber(text)}
               keyboardType="phone-pad"
-            />
-            <Input
-              label="Country"
-              value={country}
-              onChangeText={(text) => setCountry(text)}
             />
 
             {/* Gender Picker */}
