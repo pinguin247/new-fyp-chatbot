@@ -1,290 +1,369 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Alert, ToastAndroid, Modal } from 'react-native';
-import { Button, Input } from '@rneui/themed';
-import { Picker } from '@react-native-picker/picker';
-import { supabase } from '../../lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { router } from 'expo-router';
+import {
+  StyleSheet,
+  SafeAreaView,
+  View,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  Switch,
+  Image,
+  Appearance, // Appearance API to detect system-wide dark mode
+} from 'react-native';
+import FeatherIcon from 'react-native-vector-icons/Feather';
 
-export default function Profile({ session }: { session: Session }) {
-  const [loading, setLoading] = useState(false);
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+export default function Profile() {
+  const [form, setForm] = useState({
+    darkMode: false,
+    emailNotifications: true,
+    pushNotifications: false,
+  });
 
-  // Personal details fields for the modal
-  const [age, setAge] = useState(18); // Default age set to 18
-  const [phoneNumber, setPhoneNumber] = useState(''); // New phone number field
-  const [country, setCountry] = useState(''); // New country field
-  const [gender, setGender] = useState('Male');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [theme, setTheme] = useState(Appearance.getColorScheme()); // Detect initial system theme
 
+  // Detect system-wide theme change and update state accordingly
   useEffect(() => {
-    const fetchSessionAndProfile = async () => {
-      try {
-        setLoading(true);
-
-        // Fetch session
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('Error fetching session:', sessionError);
-          return;
-        }
-
-        if (sessionData?.session) {
-          setEmail(sessionData.session.user.email ?? '');
-
-          // Fetch profile data
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .eq('id', sessionData.session.user.id)
-            .single();
-
-          if (profileError) {
-            console.error('Error fetching profile data:', profileError);
-            return;
-          }
-
-          if (profileData) {
-            setUsername(profileData.full_name);
-            setAvatarUrl(profileData.avatar_url);
-            setProfileId(profileData.id); // Store the profile ID for later use
-          }
-        }
-      } catch (error) {
-        console.error('Error in fetchSessionAndProfile:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSessionAndProfile();
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setTheme(colorScheme);
+    });
+    return () => subscription.remove();
   }, []);
 
-  // Update profile function
-  const updateProfile = async ({
-    username,
-    avatar_url,
-  }: {
-    username: string;
-    avatar_url: string;
-  }) => {
-    try {
-      setLoading(true);
-
-      if (!profileId) {
-        throw new Error('Profile ID is not available.');
-      }
-
-      const updates = {
-        id: profileId,
-        full_name: username, // Assuming full_name is the field for username in profiles table
-        avatar_url,
-        updated_at: new Date(),
-      };
-
-      const { error } = await supabase.from('profiles').upsert(updates);
-
-      if (error) {
-        throw error;
-      }
-
-      ToastAndroid.show('Profile updated successfully', ToastAndroid.SHORT);
-    } catch (error) {
-      if (error instanceof Error) {
-        Alert.alert('Error', error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSavePersonalDetails = async () => {
-    try {
-      setLoading(true);
-
-      if (!profileId) {
-        throw new Error('Profile ID is not available.');
-      }
-
-      const newRecord = {
-        patient_id: profileId, // Use the stored profile ID as the foreign key
-        age: age, // Age as a number
-        phone_number: phoneNumber, // New phone number field
-        country: country, // New country field
-        gender: gender, // Gender value
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const { error } = await supabase.from('patient_inputs').insert(newRecord);
-
-      if (error) {
-        console.error('Error inserting data:', error);
-        throw error;
-      }
-
-      ToastAndroid.show(
-        'Personal details saved successfully',
-        ToastAndroid.SHORT,
-      );
-      setModalVisible(false);
-    } catch (error) {
-      if (error instanceof Error) {
-        Alert.alert('Error', error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      setLoading(true);
-      await logout();
-      ToastAndroid.show('Logged out successfully', ToastAndroid.SHORT);
-      router.replace('/');
-    } catch (error) {
-      ToastAndroid.show('Error logging out', ToastAndroid.LONG);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        throw error;
-      }
-      console.log('User signed out successfully');
-    } catch (error: any) {
-      console.error('Error signing out: ', error.message);
-    }
-  };
-
-  // Generate an array of ages (e.g., 18 to 100)
-  const ageOptions = Array.from({ length: 99 }, (_, index) => index + 1);
+  // Determine styles based on the current theme
+  const styles = theme === 'dark' ? darkStyles : lightStyles;
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.verticallySpaced, styles.mt20]}>
-        <Input label="Email" value={email} disabled />
-      </View>
-      <View style={styles.verticallySpaced}>
-        <Input
-          label="Username"
-          value={username || ''}
-          onChangeText={(text) => setUsername(text)}
-        />
-      </View>
-
-      <View style={[styles.verticallySpaced, styles.mt20]}>
-        <Button
-          title={loading ? 'Loading ...' : 'Update Profile'}
-          onPress={() => updateProfile({ username, avatar_url: avatarUrl })}
-          disabled={loading}
-        />
-      </View>
-
-      <View style={styles.verticallySpaced}>
-        <Button
-          title="Add Personal Details"
-          onPress={() => setModalVisible(true)}
-        />
-      </View>
-
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            {/* Age Picker */}
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={age}
-                onValueChange={(itemValue) => setAge(itemValue)}
-              >
-                {ageOptions.map((ageOption) => (
-                  <Picker.Item
-                    key={ageOption}
-                    label={String(ageOption)}
-                    value={ageOption}
-                  />
-                ))}
-              </Picker>
-            </View>
-
-            <Input
-              label="Phone Number"
-              value={phoneNumber}
-              onChangeText={(text) => setPhoneNumber(text)}
-              keyboardType="phone-pad"
-            />
-            <Input
-              label="Country"
-              value={country}
-              onChangeText={(text) => setCountry(text)}
-            />
-
-            {/* Gender Picker */}
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={gender}
-                onValueChange={(itemValue) => setGender(itemValue)}
-              >
-                <Picker.Item label="Male" value="Male" />
-                <Picker.Item label="Female" value="Female" />
-              </Picker>
-            </View>
-
-            <Button title="Save" onPress={handleSavePersonalDetails} />
-            <Button title="Close" onPress={() => setModalVisible(false)} />
-          </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerSubtitle}>
+            Lorem ipsum dolor sit amet consectetur.
+          </Text>
         </View>
-      </Modal>
 
-      <View style={styles.verticallySpaced}>
-        <Button title="Sign Out" onPress={handleLogout} />
+        <ScrollView>
+          <View style={styles.profile}>
+            <Image
+              alt=""
+              source={{
+                uri: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2.5&w=256&h=256&q=80',
+              }}
+              style={styles.profileAvatar}
+            />
+
+            <Text style={styles.profileName}>John Doe</Text>
+            <Text style={styles.profileEmail}>john.doe@mail.com</Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                // handle onPress
+              }}
+            >
+              <View style={styles.profileAction}>
+                <Text style={styles.profileActionText}>Edit Profile</Text>
+                <FeatherIcon color="#fff" name="edit" size={16} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Preferences</Text>
+
+            <View style={styles.sectionBody}>
+              <View style={[styles.rowWrapper, styles.rowFirst]}>
+                <TouchableOpacity
+                  onPress={() => {
+                    // handle onPress
+                  }}
+                  style={styles.row}
+                >
+                  <View
+                    style={[styles.rowIcon, { backgroundColor: '#fe9400' }]}
+                  >
+                    <FeatherIcon color="#fff" name="globe" size={20} />
+                  </View>
+
+                  <Text style={styles.rowLabel}>Language</Text>
+                  <View style={styles.rowSpacer} />
+                  <Text style={styles.rowValue}>English</Text>
+                  <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.rowWrapper}>
+                <View style={styles.row}>
+                  <View
+                    style={[styles.rowIcon, { backgroundColor: '#007AFF' }]}
+                  >
+                    <FeatherIcon color="#fff" name="moon" size={20} />
+                  </View>
+
+                  <Text style={styles.rowLabel}>Dark Mode</Text>
+                  <View style={styles.rowSpacer} />
+                  <Switch
+                    onValueChange={(darkMode) => setForm({ ...form, darkMode })}
+                    value={form.darkMode}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.rowWrapper}>
+                <TouchableOpacity
+                  onPress={() => {
+                    // handle onPress
+                  }}
+                  style={styles.row}
+                >
+                  <View
+                    style={[styles.rowIcon, { backgroundColor: '#32c759' }]}
+                  >
+                    <FeatherIcon color="#fff" name="navigation" size={20} />
+                  </View>
+
+                  <Text style={styles.rowLabel}>Location</Text>
+                  <View style={styles.rowSpacer} />
+                  <Text style={styles.rowValue}>Los Angeles, CA</Text>
+                  <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Notifications</Text>
+
+              <View style={styles.sectionBody}>
+                <View style={[styles.rowWrapper, styles.rowFirst]}>
+                  <View style={styles.row}>
+                    <View
+                      style={[styles.rowIcon, { backgroundColor: '#38C959' }]}
+                    >
+                      <FeatherIcon color="#fff" name="at-sign" size={20} />
+                    </View>
+                    <Text style={styles.rowLabel}>Email Notifications</Text>
+                    <View style={styles.rowSpacer} />
+                    <Switch
+                      onValueChange={(emailNotifications) =>
+                        setForm({ ...form, emailNotifications })
+                      }
+                      value={form.emailNotifications}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.rowWrapper}>
+                  <View style={styles.row}>
+                    <View
+                      style={[styles.rowIcon, { backgroundColor: '#38C959' }]}
+                    >
+                      <FeatherIcon color="#fff" name="bell" size={20} />
+                    </View>
+                    <Text style={styles.rowLabel}>Push Notifications</Text>
+                    <View style={styles.rowSpacer} />
+                    <Switch
+                      onValueChange={(pushNotifications) =>
+                        setForm({ ...form, pushNotifications })
+                      }
+                      value={form.pushNotifications}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.rowWrapper}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      // handle onPress
+                    }}
+                    style={styles.row}
+                  >
+                    <View
+                      style={[styles.rowIcon, { backgroundColor: '#FE3C30' }]}
+                    >
+                      <FeatherIcon color="#fff" name="music" size={20} />
+                    </View>
+
+                    <Text style={styles.rowLabel}>Sound</Text>
+                    <View style={styles.rowSpacer} />
+                    <Text style={styles.rowValue}>Default</Text>
+                    <FeatherIcon
+                      color="#C6C6C6"
+                      name="chevron-right"
+                      size={20}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginTop: 40,
-    padding: 12,
-  },
-  verticallySpaced: {
-    paddingTop: 4,
-    paddingBottom: 4,
-    alignSelf: 'stretch',
-  },
-  mt20: {
-    marginTop: 20,
-  },
-  modalContainer: {
+const lightStyles = StyleSheet.create({
+  safeArea: {
     flex: 1,
+    backgroundColor: '#f6f6f6',
+  },
+  container: {
+    paddingVertical: 24,
+    paddingHorizontal: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+  },
+  header: {
+    marginTop: 30,
+    paddingHorizontal: 24,
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1d1d1d',
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#929292',
+    marginTop: 6,
+  },
+  profile: {
+    padding: 16,
+    flexDirection: 'column',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e3e3e3',
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 9999,
+  },
+  profileName: {
+    marginTop: 12,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#090909',
+  },
+  profileEmail: {
+    marginTop: 6,
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#848484',
+  },
+  profileAction: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#007bff',
+    borderRadius: 12,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    margin: 20,
+  profileActionText: {
+    marginRight: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
-  pickerContainer: {
-    marginVertical: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+  section: {
+    paddingTop: 12,
+  },
+  sectionTitle: {
+    marginVertical: 8,
+    marginHorizontal: 24,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a7a7a7',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  sectionBody: {
+    paddingLeft: 24,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e3e3e3',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingRight: 16,
+    height: 50,
+  },
+  rowWrapper: {
+    borderTopWidth: 1,
+    borderColor: '#e3e3e3',
+  },
+  rowFirst: {
+    borderTopWidth: 0,
+  },
+  rowIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rowLabel: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#000',
+  },
+  rowSpacer: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+  },
+  rowValue: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8B8B8B',
+    marginRight: 4,
+  },
+});
+
+const darkStyles = StyleSheet.create({
+  ...lightStyles,
+  safeArea: {
+    backgroundColor: '#121212',
+  },
+  headerTitle: {
+    color: '#e0e0e0',
+  },
+  headerSubtitle: {
+    color: '#a5a5a5',
+  },
+  profile: {
+    backgroundColor: '#1e1e1e',
+  },
+  profileName: {
+    color: '#e0e0e0',
+  },
+  profileEmail: {
+    color: '#a5a5a5',
+  },
+  profileAction: {
+    backgroundColor: '#007bff',
+  },
+  sectionTitle: {
+    color: '#929292',
+  },
+  sectionBody: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#292929',
+  },
+  rowLabel: {
+    color: '#e0e0e0',
+  },
+  rowValue: {
+    color: '#a5a5a5',
   },
 });
