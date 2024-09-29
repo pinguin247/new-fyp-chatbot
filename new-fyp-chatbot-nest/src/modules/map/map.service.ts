@@ -13,6 +13,7 @@ interface UserSession {
   persuasionAttempt: number;
   current_exercise: string;
   failedPersuasionCount: number;
+  first_time: boolean; // Add first_time field
 }
 
 @Injectable()
@@ -54,6 +55,7 @@ export class MapService {
       persuasionAttempt: 0,
       current_exercise: exercise,
       failedPersuasionCount: 0,
+      first_time: true,
     };
 
     try {
@@ -68,6 +70,7 @@ export class MapService {
         persuasion_attempt: 0,
         current_exercise: exercise,
         failed_persuasion_count: 0,
+        first_time: true,
       });
     } catch (error) {
       console.error('Error creating session in Supabase:', error);
@@ -101,6 +104,7 @@ export class MapService {
           persuasionAttempt: data.persuasion_attempt || 0,
           current_exercise: data.current_exercise || '',
           failedPersuasionCount: data.failed_persuasion_count || 0,
+          first_time: data.first_time !== undefined ? data.first_time : true, // Fetch first_time, default to true if not set
         };
         console.log(`Loaded session for userId: ${userId}`);
         return this.users[userId];
@@ -109,6 +113,22 @@ export class MapService {
     } catch (error) {
       console.error('Error loading session from Supabase:', error);
       return null;
+    }
+  }
+
+  async updateFirstTime(userId: string, isFirstTime: boolean) {
+    const userSession = this.getSession(userId);
+    if (userSession) {
+      userSession.first_time = isFirstTime;
+
+      try {
+        await this.supabaseService.updateSessionData(userId, {
+          first_time: isFirstTime,
+        });
+        console.log(`Successfully updated first_time for user ${userId}`);
+      } catch (error) {
+        console.error('Error updating first_time in Supabase:', error);
+      }
     }
   }
 
@@ -259,13 +279,15 @@ export class MapService {
     const strategies = isCentralRoute
       ? centralStrategies
       : peripheralStrategies;
+    const selectedStrategies = isCentralRoute
+      ? userSession.selectedStrategies.central
+      : userSession.selectedStrategies.peripheral;
+
     let strategyIndex = userSession.strategyIndexChosen;
 
-    // Ensure the strategyIndex is within bounds of the current route's strategies
-    if (isCentralRoute) {
-      strategyIndex = strategyIndex % centralStrategies.length;
-    } else {
-      strategyIndex = strategyIndex % peripheralStrategies.length;
+    // Check if the selected strategy is still eligible, otherwise find the next eligible one
+    while (selectedStrategies[strategyIndex] === 0) {
+      strategyIndex = (strategyIndex + 1) % strategies.length;
     }
 
     console.log(`Strategy Index: ${strategyIndex}`);
@@ -281,18 +303,58 @@ export class MapService {
       `Updated specific strategy index: ${userSession.specificStrategyIndex}`,
     );
 
+    // Update strategyIndexChosen in session
+    userSession.strategyIndexChosen = strategyIndex;
+
     return chosenStrategy;
   }
 
-  async updateStrategyWeights(userId: string, successful: boolean) {
+  async updateStrategyWeights(userId: string, successful: number) {
+    let isMotivated;
+
+    if (successful == 1) {
+      isMotivated = true;
+    } else {
+      isMotivated = false;
+    }
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c >= 0.5;
 
     console.log(`\n--- Updating Strategy Weights ---`);
     console.log(`User ID: ${userId}`);
-    console.log(`Persuasion Successful: ${successful}`);
-    console.log(`Current Route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
 
+    // Check if this is the first-time response
+    if (userSession.first_time) {
+      console.log("It's the user's first time. Only updating y_c and y_p.");
+
+      // Update only y_c and y_p based on success
+      if (isMotivated) {
+        userSession.y_c = 1;
+        userSession.y_p = 0;
+      }
+      // Ensure y_c and y_p are within valid bounds
+      userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
+      userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
+
+      // Update session data in Supabase without updating strategy weights
+      try {
+        await this.supabaseService.updateSessionData(userId, {
+          y_c: userSession.y_c,
+          y_p: userSession.y_p,
+        });
+        console.log(
+          `Successfully updated y_c and y_p in Supabase for first time.`,
+        );
+      } catch (error) {
+        console.error('Error updating y_c and y_p in Supabase:', error);
+      }
+
+      return; // Skip updating strategy weights if it's the first time
+    }
+
+    //console.log(`Persuasion Successful: ${successful}`);
+    const isCentralRoute = userSession.y_c >= 0.5;
+
+    // Proceed to update strategy weights for subsequent attempts
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
@@ -319,7 +381,7 @@ export class MapService {
     );
 
     if (isCentralRoute) {
-      if (successful) {
+      if (isMotivated) {
         userSession.y_c += 0.2;
         userSession.y_p -= 0.2;
       } else {
@@ -327,7 +389,7 @@ export class MapService {
         userSession.y_p += 0.1;
       }
     } else {
-      if (successful) {
+      if (isMotivated) {
         userSession.y_c -= 0.2;
         userSession.y_p += 0.2;
       } else {

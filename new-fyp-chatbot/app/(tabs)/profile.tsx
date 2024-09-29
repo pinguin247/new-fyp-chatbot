@@ -3,10 +3,11 @@ import { StyleSheet, View, Alert, ToastAndroid, Modal } from 'react-native';
 import { Button, Input } from '@rneui/themed';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import { fetchUserProfile } from '../../lib/fetchUserProfile'; // Import the new service
+
 import { router } from 'expo-router';
 
-export default function Profile({ session }: { session: Session }) {
+export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [username, setUsername] = useState('');
@@ -16,7 +17,6 @@ export default function Profile({ session }: { session: Session }) {
   // Personal details fields for the modal
   const [age, setAge] = useState(18); // Default age set to 18
   const [phoneNumber, setPhoneNumber] = useState(''); // New phone number field
-  const [country, setCountry] = useState(''); // New country field
   const [gender, setGender] = useState('Male');
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -37,22 +37,15 @@ export default function Profile({ session }: { session: Session }) {
         if (sessionData?.session) {
           setEmail(sessionData.session.user.email ?? '');
 
-          // Fetch profile data
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url')
-            .eq('id', sessionData.session.user.id)
-            .single();
+          // Fetch profile data using fetchUserProfile
+          const profile = await fetchUserProfile(sessionData.session.user.id);
 
-          if (profileError) {
-            console.error('Error fetching profile data:', profileError);
-            return;
-          }
-
-          if (profileData) {
-            setUsername(profileData.full_name);
-            setAvatarUrl(profileData.avatar_url);
-            setProfileId(profileData.id); // Store the profile ID for later use
+          if (profile) {
+            setUsername(profile.full_name);
+            setAvatarUrl(profile.avatar_url);
+            setProfileId(profile.id); // Store the profile ID for later use
+          } else {
+            console.error('Error: Profile data is missing');
           }
         }
       } catch (error) {
@@ -115,15 +108,12 @@ export default function Profile({ session }: { session: Session }) {
         patient_id: profileId, // Use the stored profile ID as the foreign key
         age: age, // Age as a number
         phone_number: phoneNumber, // New phone number field
-        country: country, // New country field
         gender: gender, // Gender value
         created_at: new Date(),
         updated_at: new Date(),
       };
 
-      const { error, data } = await supabase
-        .from('patient_inputs')
-        .insert(newRecord);
+      const { error } = await supabase.from('patient_inputs').insert(newRecord);
 
       if (error) {
         console.error('Error inserting data:', error);
@@ -229,11 +219,6 @@ export default function Profile({ session }: { session: Session }) {
               value={phoneNumber}
               onChangeText={(text) => setPhoneNumber(text)}
               keyboardType="phone-pad"
-            />
-            <Input
-              label="Country"
-              value={country}
-              onChangeText={(text) => setCountry(text)}
             />
 
             {/* Gender Picker */}

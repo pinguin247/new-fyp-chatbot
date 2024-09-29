@@ -1,9 +1,10 @@
 {
-    "emulator.emulatorPathWindows": "C:\\Users\\yipin\\AppData\\Local\\Android\\Sdk\\emulator\\",
-    "eslint.validate": [
-        "javascript",
-        "javascriptreact",
-        "typescript",
-        "typescriptreact"
-      ]
+  "emulator.emulatorPathWindows": "C:\\Users\\yipin\\AppData\\Local\\Android\\Sdk\\emulator\\",
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "java.configuration.updateBuildConfiguration": "interactive"
 }

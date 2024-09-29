@@ -83,7 +83,7 @@ export default function Chatbot() {
       // Declare the starting message with the user's full name
       const startingMessage: IMessage = {
         _id: Math.round(Math.random() * 1000000),
-        text: `Hello ${userName}! I am your chatbot. How can I assist you today?`,
+        text: `Hi ${userName}! How are you feeling today? Let me know, and I can help you with your exercise routine!`,
         createdAt: new Date(),
         user: {
           _id: 2,
@@ -97,8 +97,8 @@ export default function Chatbot() {
         await saveMessage(userId, startingMessage.text, 'assistant');
         setMessages([startingMessage, ...formattedHistory]);
 
-        // Always recommend an exercise when the page first loads
-        await recommendExercise(userId);
+        // Commented out: Always recommend an exercise when the page first loads
+        // await recommendExercise(userId);
 
         isFirstLoad.current = false; // Set flag to false after first load
       } else {
