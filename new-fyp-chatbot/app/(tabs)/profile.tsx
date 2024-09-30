@@ -33,6 +33,10 @@ export default function Profile() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [gender, setGender] = useState('Male');
   const [modalVisible, setModalVisible] = useState(false);
+  const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+  const [availableDay, setAvailableDay] = useState('Monday');
+  const [startTime, setStartTime] = useState('06:00');
+  const [endTime, setEndTime] = useState('07:00');
 
   const [showSuccessBar, setShowSuccessBar] = useState(false);
   const [successAnim] = useState(new Animated.Value(0));
@@ -186,6 +190,46 @@ export default function Profile() {
     }
   };
 
+  const handleSaveExerciseAvailability = async () => {
+    try {
+      console.log('Saving exercise availability...'); // Debugging log
+      setLoading(true);
+      if (!profileId) {
+        throw new Error('Profile ID is not available.');
+      }
+
+      const newExerciseRecord = {
+        profile_id: profileId,
+        day_of_week: availableDay,
+        start_time: startTime,
+        end_time: endTime,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      const { error } = await supabase
+        .from('user_availability')
+        .insert(newExerciseRecord);
+
+      if (error) {
+        throw error;
+      }
+
+      ToastAndroid.show(
+        'Exercise availability saved successfully',
+        ToastAndroid.SHORT,
+      );
+      setExerciseModalVisible(false);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error saving exercise availability:', error.message); // Debugging log
+        Alert.alert('Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       setLoading(true);
@@ -255,6 +299,18 @@ export default function Profile() {
                     <FeatherIcon color="#fff" name="user-plus" size={20} />
                   </View>
                   <Text style={styles.rowLabel}>Edit Personal Details</Text>
+                  <View style={styles.rowSpacer} />
+                  <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setExerciseModalVisible(true)}>
+                <View style={[styles.row, styles.rowFirst]}>
+                  <View
+                    style={[styles.rowIcon, { backgroundColor: '#38C959' }]}
+                  >
+                    <FeatherIcon color="#fff" name="plus" size={20} />
+                  </View>
+                  <Text style={styles.rowLabel}>Add Exercise Availability</Text>
                   <View style={styles.rowSpacer} />
                   <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
                 </View>
@@ -381,6 +437,66 @@ export default function Profile() {
               buttonStyle={styles.closeButton}
               containerStyle={styles.closeButtonContainer}
               onPress={() => setModalVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={exerciseModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setExerciseModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Exercise Availability</Text>
+
+            <Text style={styles.modalLabel}>Day</Text>
+            <Picker
+              selectedValue={availableDay}
+              onValueChange={(value) => setAvailableDay(value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Monday" value="Monday" />
+              <Picker.Item label="Tuesday" value="Tuesday" />
+              <Picker.Item label="Wednesday" value="Wednesday" />
+              <Picker.Item label="Thursday" value="Thursday" />
+              <Picker.Item label="Friday" value="Friday" />
+              <Picker.Item label="Saturday" value="Saturday" />
+              <Picker.Item label="Sunday" value="Sunday" />
+            </Picker>
+
+            <Text style={styles.modalLabel}>Start Time</Text>
+            <Input
+              value={startTime}
+              onChangeText={(text) => setStartTime(text)}
+              keyboardType="number-pad"
+              containerStyle={styles.inputContainer}
+              inputStyle={styles.inputText}
+            />
+
+            <Text style={styles.modalLabel}>End Time</Text>
+            <Input
+              value={endTime}
+              onChangeText={(text) => setEndTime(text)}
+              keyboardType="number-pad"
+              containerStyle={styles.inputContainer}
+              inputStyle={styles.inputText}
+            />
+
+            <Button
+              title="Save"
+              buttonStyle={styles.saveButton}
+              containerStyle={styles.saveButtonContainer}
+              onPress={handleSaveExerciseAvailability}
+            />
+            <Button
+              title="Close"
+              type="outline"
+              buttonStyle={styles.closeButton}
+              containerStyle={styles.closeButtonContainer}
+              onPress={() => setExerciseModalVisible(false)}
             />
           </View>
         </View>
