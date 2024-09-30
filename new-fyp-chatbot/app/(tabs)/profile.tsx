@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
-  Alert,
   ToastAndroid,
   Modal,
   SafeAreaView,
@@ -12,6 +11,9 @@ import {
   Image,
   Switch,
   StatusBar,
+  Platform,
+  Animated,
+  Alert,
 } from 'react-native';
 import { Button, Input } from '@rneui/themed';
 import { Picker } from '@react-native-picker/picker';
@@ -27,11 +29,13 @@ export default function Profile() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-
   const [age, setAge] = useState(18);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [gender, setGender] = useState('Male');
   const [modalVisible, setModalVisible] = useState(false);
+
+  const [showSuccessBar, setShowSuccessBar] = useState(false);
+  const [successAnim] = useState(new Animated.Value(0));
 
   const [form, setForm] = useState({
     emailNotifications: true,
@@ -58,6 +62,24 @@ export default function Profile() {
             setUsername(profile.full_name);
             setAvatarUrl(profile.avatar_url);
             setProfileId(profile.id);
+
+            // Check for existing patient_inputs data
+            const { data: patientInputs, error: fetchError } = await supabase
+              .from('patient_inputs')
+              .select('*')
+              .eq('patient_id', profile.id)
+              .single();
+
+            if (fetchError && fetchError.code !== 'PGRST116') {
+              throw fetchError;
+            }
+
+            if (patientInputs) {
+              // Autofill the form fields
+              setAge(patientInputs.age);
+              setPhoneNumber(patientInputs.phone_number);
+              setGender(patientInputs.gender);
+            }
           } else {
             console.error('Error: Profile data is missing');
           }
@@ -72,37 +94,6 @@ export default function Profile() {
     fetchSessionAndProfile();
   }, []);
 
-  const updateProfile = async ({ username, avatar_url, email }) => {
-    try {
-      setLoading(true);
-      if (!profileId) {
-        throw new Error('Profile ID is not available.');
-      }
-
-      const updates = {
-        id: profileId,
-        full_name: username,
-        avatar_url,
-        email,
-        updated_at: new Date(),
-      };
-
-      const { error } = await supabase.from('profiles').upsert(updates);
-
-      if (error) {
-        throw error;
-      }
-
-      ToastAndroid.show('Profile updated successfully', ToastAndroid.SHORT);
-    } catch (error) {
-      if (error instanceof Error) {
-        Alert.alert('Error', error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSavePersonalDetails = async () => {
     try {
       setLoading(true);
@@ -110,32 +101,81 @@ export default function Profile() {
         throw new Error('Profile ID is not available.');
       }
 
-      await updateProfile({
-        username,
-        avatar_url: avatarUrl,
-        email,
-      });
+      // Update the user profile in Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: username,
+          email: email,
+          updated_at: new Date(),
+        })
+        .eq('id', profileId); // Ensure you're updating the correct profile
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      // Check if the patient_inputs record exists
+      const { data: existingRecord, error: fetchError } = await supabase
+        .from('patient_inputs')
+        .select('*')
+        .eq('patient_id', profileId)
+        .single(); // Fetches a single record if it exists
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // If there is any error other than "No Rows Found" (PGRST116), throw the error
+        throw fetchError;
+      }
 
       const newRecord = {
         patient_id: profileId,
         age: age,
         phone_number: phoneNumber,
         gender: gender,
-        created_at: new Date(),
         updated_at: new Date(),
       };
 
-      const { error } = await supabase.from('patient_inputs').insert(newRecord);
-
-      if (error) {
-        console.error('Error inserting data:', error);
-        throw error;
+      let response;
+      if (existingRecord) {
+        // Update the existing record
+        response = await supabase
+          .from('patient_inputs')
+          .update(newRecord)
+          .eq('patient_id', profileId);
+      } else {
+        // Insert a new record if it doesn't exist
+        response = await supabase.from('patient_inputs').insert(newRecord);
       }
 
-      ToastAndroid.show(
-        'Personal details saved successfully',
-        ToastAndroid.SHORT,
-      );
+      const { error: saveError } = response;
+      if (saveError) {
+        throw saveError;
+      }
+
+      // Show success message
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          'Personal details saved successfully',
+          ToastAndroid.SHORT,
+        );
+      } else {
+        // For iOS, show custom success bar
+        setShowSuccessBar(true);
+        Animated.timing(successAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: false,
+        }).start(() => {
+          setTimeout(() => {
+            Animated.timing(successAnim, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: false,
+            }).start(() => setShowSuccessBar(false));
+          }, 2000); // Show for 2 seconds
+        });
+      }
+
       setModalVisible(false);
     } catch (error) {
       if (error instanceof Error) {
@@ -345,6 +385,23 @@ export default function Profile() {
           </View>
         </View>
       </Modal>
+
+      {showSuccessBar && (
+        <Animated.View
+          style={[
+            styles.successBar,
+            {
+              opacity: successAnim,
+              bottom: successAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-50, 0],
+              }),
+            },
+          ]}
+        >
+          <Text style={styles.successText}>Details updated successfully!</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -507,5 +564,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
     color: '#dc2626',
+  },
+  successBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: 'green',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

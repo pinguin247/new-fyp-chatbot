@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import CalendarPicker from 'react-native-calendar-picker';
+import { Colors } from '@/constants/Colors';
 
 interface ScheduleItem {
   id: string;
@@ -72,9 +73,9 @@ export default function Schedule() {
         <CalendarPicker
           onDateChange={onDateChange}
           selectedStartDate={selectedDate as any}
-          selectedDayColor="#7300e6"
+          selectedDayColor={Colors.NAVY}
           selectedDayTextColor="#FFFFFF"
-          todayBackgroundColor="#f2e6ff"
+          todayBackgroundColor="#21355866"
           textStyle={styles.calendarText}
         />
         <ScrollView style={styles.scheduleList}>
