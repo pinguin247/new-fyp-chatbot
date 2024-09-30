@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { ComponentType } from 'react';
 
 declare module 'react-native-calendar-picker' {
