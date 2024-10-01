@@ -33,10 +33,17 @@ export default function Profile() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [gender, setGender] = useState('Male');
   const [modalVisible, setModalVisible] = useState(false);
-  const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+  const [
+    exerciseAvailabilityModalVisible,
+    setExerciseAvailabilityModalVisible,
+  ] = useState(false);
+
   const [availableDay, setAvailableDay] = useState('Monday');
   const [startTime, setStartTime] = useState('06:00');
   const [endTime, setEndTime] = useState('07:00');
+  const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+  const [newExerciseName, setNewExerciseName] = useState('');
+  const [newExerciseIntensity, setNewExerciseIntensity] = useState('moderate');
 
   const [showSuccessBar, setShowSuccessBar] = useState(false);
   const [successAnim] = useState(new Animated.Value(0));
@@ -219,10 +226,33 @@ export default function Profile() {
         'Exercise availability saved successfully',
         ToastAndroid.SHORT,
       );
-      setExerciseModalVisible(false);
+      setExerciseAvailabilityModalVisible(false);
     } catch (error) {
       if (error instanceof Error) {
         console.error('Error saving exercise availability:', error.message); // Debugging log
+        Alert.alert('Error', error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddExercise = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from('exercises').insert({
+        name: newExerciseName,
+        intensity: newExerciseIntensity,
+      });
+
+      if (error) throw error;
+
+      ToastAndroid.show('Exercise added successfully', ToastAndroid.SHORT);
+      setExerciseModalVisible(false);
+      setNewExerciseName('');
+      setNewExerciseIntensity('moderate');
+    } catch (error) {
+      if (error instanceof Error) {
         Alert.alert('Error', error.message);
       }
     } finally {
@@ -289,7 +319,7 @@ export default function Profile() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account Information</Text>
+            <Text style={styles.sectionTitle}>Manage Account</Text>
             <View style={styles.sectionBody}>
               <TouchableOpacity onPress={() => setModalVisible(true)}>
                 <View style={[styles.row, styles.rowFirst]}>
@@ -303,7 +333,9 @@ export default function Profile() {
                   <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setExerciseModalVisible(true)}>
+              <TouchableOpacity
+                onPress={() => setExerciseAvailabilityModalVisible(true)}
+              >
                 <View style={[styles.row, styles.rowFirst]}>
                   <View
                     style={[styles.rowIcon, { backgroundColor: '#38C959' }]}
@@ -311,6 +343,18 @@ export default function Profile() {
                     <FeatherIcon color="#fff" name="plus" size={20} />
                   </View>
                   <Text style={styles.rowLabel}>Add Exercise Availability</Text>
+                  <View style={styles.rowSpacer} />
+                  <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setExerciseModalVisible(true)}>
+                <View style={[styles.row, styles.rowFirst]}>
+                  <View
+                    style={[styles.rowIcon, { backgroundColor: '#FFA500' }]}
+                  >
+                    <FeatherIcon color="#fff" name="plus-circle" size={20} />
+                  </View>
+                  <Text style={styles.rowLabel}>Add New Exercise</Text>
                   <View style={styles.rowSpacer} />
                   <FeatherIcon color="#C6C6C6" name="chevron-right" size={20} />
                 </View>
@@ -443,10 +487,10 @@ export default function Profile() {
       </Modal>
 
       <Modal
-        visible={exerciseModalVisible}
+        visible={exerciseAvailabilityModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setExerciseModalVisible(false)}
+        onRequestClose={() => setExerciseAvailabilityModalVisible(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -490,6 +534,57 @@ export default function Profile() {
               buttonStyle={styles.saveButton}
               containerStyle={styles.saveButtonContainer}
               onPress={handleSaveExerciseAvailability}
+            />
+            <Button
+              title="Close"
+              type="outline"
+              buttonStyle={styles.closeButton}
+              containerStyle={styles.closeButtonContainer}
+              onPress={() => setExerciseAvailabilityModalVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={exerciseModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setExerciseModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add New Exercise</Text>
+
+            <Text style={styles.modalLabel}>Exercise Name</Text>
+            <Input
+              value={newExerciseName}
+              onChangeText={(text) => setNewExerciseName(text)}
+              containerStyle={styles.inputContainer}
+              inputStyle={styles.inputText}
+            />
+
+            <Text style={styles.modalLabel}>Intensity</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={newExerciseIntensity}
+                onValueChange={(itemValue) =>
+                  setNewExerciseIntensity(itemValue)
+                }
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+              >
+                <Picker.Item label="Low" value="low" />
+                <Picker.Item label="Moderate" value="moderate" />
+                <Picker.Item label="Vigorous" value="vigorous" />
+              </Picker>
+            </View>
+
+            <Button
+              title="Add Exercise"
+              buttonStyle={styles.saveButton}
+              containerStyle={styles.saveButtonContainer}
+              onPress={handleAddExercise}
             />
             <Button
               title="Close"
@@ -648,7 +743,16 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     backgroundColor: '#f0f0f0',
     borderRadius: 5,
-    padding: 5,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+  },
+  pickerItem: {
+    fontSize: 16,
   },
   inputContainer: {
     marginTop: 2,
