@@ -69,6 +69,9 @@ export class ChatService {
     console.log('Processing chat for user:', userId, 'with message:', content);
 
     try {
+      // Clear the conversation history before processing new chat
+      this.conversationHistory = [];
+
       let userSession = await this.mapService.loadSessionFromSupabase(userId);
 
       // If no session found, create a new one
@@ -196,13 +199,6 @@ export class ChatService {
       // Get response from GPT
       const botMessage = await this.generateGPTResponsewithChatHistory(prompt);
       this.conversationHistory.push({ role: 'assistant', content: botMessage });
-
-      // Save the assistant's message to Supabase
-      await this.supabaseService.insertChatHistory(
-        userId,
-        'assistant',
-        botMessage,
-      );
 
       // Handle 3 or 6 failed persuasion attempts
       return await this.handlePersuasionAttempts(
@@ -345,21 +341,21 @@ export class ChatService {
   }
 
   // Function to generate GPT-3 response
-  private async generateGPTResponse(prompt: string) {
-    try {
-      const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant' },
-          ...this.conversationHistory,
-          { role: 'user', content: prompt },
-        ],
-      });
-      return chatCompletion.choices[0].message.content;
-    } catch (error) {
-      throw new Error('Error while generating GPT response.');
-    }
-  }
+  // private async generateGPTResponse(prompt: string) {
+  //   try {
+  //     const chatCompletion = await this.openai.chat.completions.create({
+  //       model: 'gpt-3.5-turbo',
+  //       messages: [
+  //         { role: 'system', content: 'You are a helpful assistant' },
+  //         ...this.conversationHistory,
+  //         { role: 'user', content: prompt },
+  //       ],
+  //     });
+  //     return chatCompletion.choices[0].message.content;
+  //   } catch (error) {
+  //     throw new Error('Error while generating GPT response.');
+  //   }
+  // }
 
   private async generateGPTResponsewithChatHistory(prompt: string) {
     try {
