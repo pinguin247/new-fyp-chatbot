@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MapService } from '../map/map.service';
 import { PatientService } from '../patient/patient.service';
+import { UserAvailabilityService } from '../userAvailability/user_availability.service';
+import { ExerciseAllocationService } from '../exercise/exercise_allocation.service';
+import { DateTime } from 'luxon';
 @Injectable()
 export class ChatService {
   private openai: OpenAI;
@@ -15,6 +18,8 @@ export class ChatService {
     private readonly supabaseService: SupabaseService, // Inject SupabaseService
     private readonly mapService: MapService,
     private readonly patientService: PatientService,
+    private readonly userAvailabilityService: UserAvailabilityService,
+    private readonly exerciseAllocationService: ExerciseAllocationService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -26,6 +31,10 @@ export class ChatService {
     console.error(`${errorMessage}:`, error);
     return { success: false, message: errorMessage };
   }
+
+  formatTimeTo12Hour = (time: string) => {
+    return DateTime.fromISO(time).toLocaleString(DateTime.TIME_SIMPLE); // Example: 1:30 PM
+  };
 
   async createNewSession(userId: string, exerciseId: string) {
     console.log(`Creating a new session for user: ${userId}`);
@@ -226,29 +235,98 @@ export class ChatService {
     userId: string,
     currentExercise: string,
   ) {
-    // Create a prompt for GPT to generate a thank you message with resources
-    const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement and provide links or resources that would help them complete the exercise effectively. (at most 2 paras)`;
+    // Check for free slots first before sending the prompt
+    const exerciseDuration = 30; // Set the exercise duration, for example, 30 minutes
+    const allocationResult =
+      await this.exerciseAllocationService.allocateExerciseSlot(
+        userId,
+        currentExercise,
+        exerciseDuration,
+      );
 
-    // Get the GPT response for the personalized message
-    const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
+    // If the user has a free slot, proceed with the allocation
+    if (allocationResult.success) {
+      // Incorporate the allocated time and day into the success message
+      const { message } = allocationResult; // The message contains allocated day and time details
 
-    // Add the GPT response to the conversation history
+      const formattedMessage = message.replace(
+        /(\d{2}:\d{2}:\d{2})/g,
+        (match) => this.formatTimeTo12Hour(match),
+      );
+
+      // Create a prompt for GPT to generate a thank you message with resources and success message
+      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras)`;
+
+      // Get the GPT response for the personalized message
+      const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
+
+      // Add the GPT response to the conversation history
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: gptResponse,
+      });
+
+      // Save the GPT response in Supabase
+      await this.supabaseService.insertChatHistory(
+        userId,
+        'assistant',
+        gptResponse,
+      );
+
+      // Save the allocation success message in Supabase
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: `Exercise has been scheduled successfully. ${allocationResult.message}`,
+      });
+
+      await this.supabaseService.insertChatHistory(
+        userId,
+        'assistant',
+        `Exercise has been scheduled successfully. ${allocationResult.message}`,
+      );
+
+      // Update the strategy weights to reflect the successful persuasion
+      await this.mapService.updateStrategyWeights(userId, 1);
+
+      return { response: gptResponse };
+    }
+
+    // If no free slots are available, modify the prompt
+    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational.`;
+
+    // Get the GPT response for the no-slot scenario
+    const noSlotResponse =
+      await this.generateGPTResponsewithChatHistory(noSlotPrompt);
+
+    // Add the response to the conversation history
     this.conversationHistory.push({
       role: 'assistant',
-      content: gptResponse,
+      content: noSlotResponse,
     });
 
-    // Save the GPT response in Supabase
+    // // Save the no-slot response in Supabase
+    // await this.supabaseService.insertChatHistory(
+    //   userId,
+    //   'assistant',
+    //   noSlotResponse,
+    // );
+
+    // Also save a failure message about slot availability
+    this.conversationHistory.push({
+      role: 'assistant',
+      content: `Unfortunately, we couldn't find an available slot for your exercise. Please try to free up some time in your schedule and attempt the exercise.`,
+    });
+
     await this.supabaseService.insertChatHistory(
       userId,
       'assistant',
-      gptResponse,
+      `Unfortunately, we couldn't find an available slot for your exercise. Please try to free up some time in your schedule and attempt the exercise.`,
     );
 
-    // Update the strategy weights to reflect the successful persuasion
-    await this.mapService.updateStrategyWeights(userId, 1);
+    // Update the strategy weights to reflect unsuccessful persuasion
+    await this.mapService.updateStrategyWeights(userId, 0);
 
-    return { response: gptResponse };
+    return { response: noSlotResponse };
   }
 
   // Handle persuasion logic for 3 and 6 attempts
@@ -391,12 +469,11 @@ export class ChatService {
     // Create a refined prompt for GPT to classify motivation correctly
     const prompt = `The user has provided the following response: "${response}". 
   Based on this input, return the user's motivation level as a number: 
-  1 for High Motivation, 0 for Low Motivation, or 0.5 for Neutral Motivation.
+  1 for High Motivation, 0 for Low Motivation
   
   Here are examples of responses and how they should be categorized:
   - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
   - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
-  - Neutral Motivation (0.5): "meh", "maybe", "not sure", "I guess"
 
   Please respond only with the number.`;
 
@@ -416,7 +493,7 @@ export class ChatService {
       );
 
       // Return the parsed number, ensure it's one of the expected values
-      if (motivation === 1 || motivation === 0 || motivation === 0.5) {
+      if (motivation === 1 || motivation === 0) {
         return motivation;
       } else {
         throw new Error('Unexpected value returned from GPT.');
@@ -546,7 +623,7 @@ export class ChatService {
     - 0 for Low Motivation (feeling negative or uninterested).
   
     Here are examples for mood-related responses:
-    - High Motivation (1): "I'm great", "feeling awesome", "ready to go", "let's do this", "energetic", "motivated"
+    - High Motivation (1): "I'm great", "feeling awesome", "ready to go", "let's do this", "energetic", "motivated",
     - Low Motivation (0): "I'm tired", "not feeling it", "meh", "I'm okay", "could be better", "not today", "feeling down".
   
     Only respond with the number 1 or 0.`;

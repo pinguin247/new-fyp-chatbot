@@ -11,6 +11,9 @@ import { SupabaseService } from './modules/supabase/supabase.service';
 import { MapService } from './modules/map/map.service';
 import { ExerciseService } from './modules/exercise/exercise.service';
 import { PatientService } from './modules/patient/patient.service';
+import { UserAvailabilityService } from './modules/userAvailability/user_availability.service';
+import { ExerciseAllocationService } from './modules/exercise/exercise_allocation.service';
+
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
@@ -34,6 +37,8 @@ import { ConfigModule } from '@nestjs/config';
     MapService,
     ExerciseService,
     PatientService,
+    UserAvailabilityService,
+    ExerciseAllocationService,
   ],
 })
 export class AppModule {}
