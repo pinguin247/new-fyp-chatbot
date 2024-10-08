@@ -202,7 +202,7 @@ export class MapService {
       `Current motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    const isCentralRoute = userSession.y_c >= 0.5;
+    const isCentralRoute = userSession.y_c > userSession.y_p;
     const chosenRoute = isCentralRoute ? 'central' : 'peripheral';
 
     console.log(`Chosen route: ${chosenRoute}`);
@@ -275,7 +275,7 @@ export class MapService {
 
   getCurrentStrategy(userId: string): string {
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c >= userSession.y_p;
+    const isCentralRoute = userSession.y_c > userSession.y_p;
 
     console.log(`\n--- Getting Current Strategy ---`);
     console.log(`User ID: ${userId}`);
@@ -360,7 +360,7 @@ export class MapService {
       return;
     }
 
-    const isCentralRoute = userSession.y_c >= userSession.y_p;
+    const isCentralRoute = userSession.y_c > userSession.y_p;
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
