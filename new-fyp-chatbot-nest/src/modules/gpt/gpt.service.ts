@@ -5,6 +5,7 @@ import { MapService } from '../map/map.service';
 import { PatientService } from '../patient/patient.service';
 import { UserAvailabilityService } from '../userAvailability/user_availability.service';
 import { ExerciseAllocationService } from '../exercise/exercise_allocation.service';
+import { DateTime } from 'luxon';
 @Injectable()
 export class ChatService {
   private openai: OpenAI;
@@ -30,6 +31,10 @@ export class ChatService {
     console.error(`${errorMessage}:`, error);
     return { success: false, message: errorMessage };
   }
+
+  formatTimeTo12Hour = (time: string) => {
+    return DateTime.fromISO(time).toLocaleString(DateTime.TIME_SIMPLE); // Example: 1:30 PM
+  };
 
   async createNewSession(userId: string, exerciseId: string) {
     console.log(`Creating a new session for user: ${userId}`);
@@ -244,8 +249,13 @@ export class ChatService {
       // Incorporate the allocated time and day into the success message
       const { message } = allocationResult; // The message contains allocated day and time details
 
+      const formattedMessage = message.replace(
+        /(\d{2}:\d{2}:\d{2})/g,
+        (match) => this.formatTimeTo12Hour(match),
+      );
+
       // Create a prompt for GPT to generate a thank you message with resources and success message
-      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${message}. (at most 3 paras)`;
+      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras)`;
 
       // Get the GPT response for the personalized message
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
