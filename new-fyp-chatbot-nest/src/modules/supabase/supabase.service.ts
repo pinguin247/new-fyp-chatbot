@@ -358,4 +358,95 @@ export class SupabaseService {
       throw error;
     }
   }
+
+  async fetchUserBookings(
+    userId: string,
+    startTime: string,
+    endTime: string,
+    dayOfWeek?: string, // Optional parameter if needed
+  ) {
+    try {
+      let query = this.getClient()
+        .from('exercise_allocations')
+        .select('*')
+        .eq('profile_id', userId)
+        .eq('start_time', startTime)
+        .eq('end_time', endTime);
+
+      // If dayOfWeek is provided, add it to the query
+      if (dayOfWeek) {
+        query = query.eq('day_of_week', dayOfWeek);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to fetch bookings: ${error.message}`);
+      }
+
+      // Check if no data was returned
+      if (!data || data.length === 0) {
+        console.log('No bookings found for the given time slot.');
+        return []; // Return an empty array to signify no bookings
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
+      throw new Error('Failed to fetch bookings');
+    }
+  }
+
+  async fetchUserBookingsInWeek(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    const { data, error } = await this.getClient()
+      .from('exercise_allocations')
+      .select('*')
+      .eq('profile_id', userId)
+      .gte('exercise_date', startDate)
+      .lte('exercise_date', endDate);
+
+    if (error) {
+      throw new Error(`Failed to fetch bookings: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async allocateExercise(data: {
+    profile_id: string;
+    exercise_name: string;
+    exercise_date: string;
+    start_time: string;
+    end_time: string;
+    duration: number;
+  }) {
+    const {
+      profile_id,
+      exercise_name,
+      exercise_date,
+      start_time,
+      end_time,
+      duration,
+    } = data;
+
+    const { error } = await this.supabase.from('exercise_allocations').insert([
+      {
+        profile_id,
+        exercise_name,
+        exercise_date,
+        start_time,
+        end_time,
+        duration,
+      },
+    ]);
+
+    if (error) {
+      console.error('Error inserting exercise allocation:', error);
+      throw new Error('Failed to allocate exercise');
+    }
+  }
 }

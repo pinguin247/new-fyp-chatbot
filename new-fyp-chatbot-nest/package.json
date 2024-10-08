@@ -29,6 +29,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "install": "^0.13.0",
+    "luxon": "^3.5.0",
     "npm": "^10.8.2",
     "openai": "^4.53.2",
     "reflect-metadata": "^0.2.0",
