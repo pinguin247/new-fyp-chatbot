@@ -14,6 +14,7 @@ interface UserSession {
   current_exercise: string;
   failedPersuasionCount: number;
   first_time: boolean; // Add first_time field
+  first_route_chosen?: 'central' | 'peripheral';
 }
 
 @Injectable()
@@ -59,6 +60,7 @@ export class MapService {
       current_exercise: exercise,
       failedPersuasionCount: 0,
       first_time: true,
+      first_route_chosen: undefined,
     };
 
     try {
@@ -74,6 +76,7 @@ export class MapService {
         current_exercise: exercise,
         failed_persuasion_count: 0,
         first_time: true,
+        first_route_chosen: undefined,
       });
     } catch (error) {
       console.error('Error creating session in Supabase:', error);
@@ -200,7 +203,23 @@ export class MapService {
     );
 
     const isCentralRoute = userSession.y_c >= 0.5;
-    console.log(`Chosen route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
+    const chosenRoute = isCentralRoute ? 'central' : 'peripheral';
+
+    console.log(`Chosen route: ${chosenRoute}`);
+
+    // Check if it's the first time a route is being chosen
+    if (!userSession.first_route_chosen) {
+      userSession.first_route_chosen = chosenRoute;
+
+      try {
+        // Save the first route to Supabase
+        this.supabaseService.updateSessionData(userId, {
+          first_route_chosen: chosenRoute,
+        });
+      } catch (error) {
+        console.error('Error saving first_route_chosen in Supabase:', error);
+      }
+    }
 
     const candidateStrategiesWeights = isCentralRoute
       ? userSession.strategyWeights.central
@@ -241,8 +260,7 @@ export class MapService {
     if (isCentralRoute) {
       userSession.strategyIndexChosen %= 5; // 5 central strategies
     } else {
-      userSession.strategyIndexChosen =
-        (userSession.strategyIndexChosen + 5) % 6; // 6 peripheral strategies
+      userSession.strategyIndexChosen = userSession.strategyIndexChosen %= 6;
     }
 
     console.log(
@@ -257,7 +275,7 @@ export class MapService {
 
   getCurrentStrategy(userId: string): string {
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c >= 0.5;
+    const isCentralRoute = userSession.y_c >= userSession.y_p;
 
     console.log(`\n--- Getting Current Strategy ---`);
     console.log(`User ID: ${userId}`);
@@ -342,7 +360,7 @@ export class MapService {
       return;
     }
 
-    const isCentralRoute = userSession.y_c >= 0.5;
+    const isCentralRoute = userSession.y_c >= userSession.y_p;
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
@@ -371,21 +389,29 @@ export class MapService {
       `Before adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    if (isCentralRoute) {
-      if (isMotivated) {
-        userSession.y_c += this.ROUTE_ADJUSTMENT;
-        userSession.y_p -= this.ROUTE_ADJUSTMENT;
+    // Use ROUTE_ADJUSTMENT for the changes
+    const ROUTE_ADJUSTMENT = this.ROUTE_ADJUSTMENT;
+
+    // Central Route first, then switch to Peripheral after 3 attempts
+    if (userSession.first_route_chosen === 'central') {
+      if (isCentralRoute) {
+        // First 3 attempts, decrease y_c by ROUTE_ADJUSTMENT and increase y_p by ROUTE_ADJUSTMENT
+        userSession.y_c -= ROUTE_ADJUSTMENT;
+        userSession.y_p += ROUTE_ADJUSTMENT;
       } else {
-        userSession.y_c -= this.ROUTE_ADJUSTMENT / 2;
-        userSession.y_p += this.ROUTE_ADJUSTMENT / 2;
+        // After switching to peripheral, decrement y_p by half of ROUTE_ADJUSTMENT on failure
+        userSession.y_p -= ROUTE_ADJUSTMENT / 2;
+        userSession.y_c += ROUTE_ADJUSTMENT / 2;
       }
     } else {
-      if (isMotivated) {
-        userSession.y_c -= this.ROUTE_ADJUSTMENT;
-        userSession.y_p += this.ROUTE_ADJUSTMENT;
+      // Peripheral route first, then switch to Central after 3 attempts
+      if (!isCentralRoute) {
+        userSession.y_p -= ROUTE_ADJUSTMENT;
+        userSession.y_c += ROUTE_ADJUSTMENT;
       } else {
-        userSession.y_c += this.ROUTE_ADJUSTMENT;
-        userSession.y_p -= this.ROUTE_ADJUSTMENT;
+        // After switching to central, decrement y_c by half of ROUTE_ADJUSTMENT on failure
+        userSession.y_c -= ROUTE_ADJUSTMENT / 2;
+        userSession.y_p += ROUTE_ADJUSTMENT / 2;
       }
     }
 
@@ -395,6 +421,16 @@ export class MapService {
     console.log(
       `After adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
+
+    // Check if it is the 6th attempt and unsuccessful
+    if (!isMotivated && userSession.persuasionAttempt === 6) {
+      console.log('6th attempt failed, marking strategy as ineligible.');
+      if (isCentralRoute) {
+        userSession.selectedStrategies.central[index] = 0; // Mark central strategy as ineligible
+      } else {
+        userSession.selectedStrategies.peripheral[index] = 0; // Mark peripheral strategy as ineligible
+      }
+    }
 
     // Update session data in Supabase
     try {
