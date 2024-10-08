@@ -125,12 +125,12 @@ export class SupabaseService {
 
       console.log('Profile fetched:', profile);
 
-      // Fetch chat history for the correct profile id
+      // Fetch chat history for the correct profile id and order by created_at
       const { data, error } = await this.supabase
         .from('chat_history')
         .select('*')
         .eq('user_id', profile.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true }); // Ensure sorting by created_at
 
       if (error) {
         console.error('Error fetching chat history:', error.message);

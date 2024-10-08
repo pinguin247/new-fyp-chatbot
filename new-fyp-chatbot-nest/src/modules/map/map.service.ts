@@ -14,11 +14,15 @@ interface UserSession {
   current_exercise: string;
   failedPersuasionCount: number;
   first_time: boolean; // Add first_time field
+  first_route_chosen?: 'central' | 'peripheral';
 }
 
 @Injectable()
 export class MapService {
   private users: Record<string, UserSession> = {};
+  private readonly LEARNING_RATE = 0.1;
+  private readonly DECAY_RATE = 0.9;
+  private readonly ROUTE_ADJUSTMENT = 0.2;
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
@@ -56,6 +60,7 @@ export class MapService {
       current_exercise: exercise,
       failedPersuasionCount: 0,
       first_time: true,
+      first_route_chosen: undefined,
     };
 
     try {
@@ -71,6 +76,7 @@ export class MapService {
         current_exercise: exercise,
         failed_persuasion_count: 0,
         first_time: true,
+        first_route_chosen: undefined,
       });
     } catch (error) {
       console.error('Error creating session in Supabase:', error);
@@ -181,16 +187,14 @@ export class MapService {
     console.log(`Initial motivation (x_m): ${x_m}`);
     console.log(`Persuasion Attempt: ${userSession.persuasionAttempt}`);
 
-    // Only set y_c and y_p on the first attempt
+    // Set initial y_c and y_p based on x_m
     if (userSession.persuasionAttempt === 0) {
-      console.log(`First attempt, setting initial y_c and y_p`);
-      userSession.y_c = x_m;
-      if (userSession.y_c < 0.5) {
-        userSession.y_c = 0;
-        userSession.y_p = 1;
-      } else {
+      if (x_m > 0.5) {
         userSession.y_c = 1;
         userSession.y_p = 0;
+      } else {
+        userSession.y_c = 0;
+        userSession.y_p = 1;
       }
     }
 
@@ -198,8 +202,24 @@ export class MapService {
       `Current motivation values: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    const isCentralRoute = userSession.y_c >= 0.5;
-    console.log(`Chosen route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
+    const isCentralRoute = userSession.y_c > userSession.y_p;
+    const chosenRoute = isCentralRoute ? 'central' : 'peripheral';
+
+    console.log(`Chosen route: ${chosenRoute}`);
+
+    // Check if it's the first time a route is being chosen
+    if (!userSession.first_route_chosen) {
+      userSession.first_route_chosen = chosenRoute;
+
+      try {
+        // Save the first route to Supabase
+        this.supabaseService.updateSessionData(userId, {
+          first_route_chosen: chosenRoute,
+        });
+      } catch (error) {
+        console.error('Error saving first_route_chosen in Supabase:', error);
+      }
+    }
 
     const candidateStrategiesWeights = isCentralRoute
       ? userSession.strategyWeights.central
@@ -215,11 +235,11 @@ export class MapService {
       `Candidate Selected Strategies: ${JSON.stringify(candidateSelectedStrategies)}`,
     );
 
-    // Calculate activation vectors
+    // Calculate activation vectors: zj = ykwjkej
     const activationVectors: number[] = candidateStrategiesWeights.map(
       (weight, i) =>
-        weight *
         Math.max(userSession.y_c, userSession.y_p) *
+        weight *
         candidateSelectedStrategies[i],
     );
 
@@ -233,13 +253,14 @@ export class MapService {
     console.log(`Chosen strategy index: ${userSession.strategyIndexChosen}`);
     console.log(`Max activation vector: ${maxActivationVector}`);
 
-    candidateSelectedStrategies[userSession.strategyIndexChosen] = 0; // Update eligibility
+    // Update eligibility
+    candidateSelectedStrategies[userSession.strategyIndexChosen] = 0;
+
     // Ensure strategyIndexChosen is within bounds
     if (isCentralRoute) {
       userSession.strategyIndexChosen %= 5; // 5 central strategies
     } else {
-      userSession.strategyIndexChosen =
-        (userSession.strategyIndexChosen + 5) % 6; // 6 peripheral strategies
+      userSession.strategyIndexChosen = userSession.strategyIndexChosen %= 6;
     }
 
     console.log(
@@ -254,7 +275,7 @@ export class MapService {
 
   getCurrentStrategy(userId: string): string {
     const userSession = this.users[userId];
-    const isCentralRoute = userSession.y_c >= 0.5;
+    const isCentralRoute = userSession.y_c > userSession.y_p;
 
     console.log(`\n--- Getting Current Strategy ---`);
     console.log(`User ID: ${userId}`);
@@ -310,32 +331,21 @@ export class MapService {
   }
 
   async updateStrategyWeights(userId: string, successful: number) {
-    let isMotivated;
-
-    if (successful == 1) {
-      isMotivated = true;
-    } else {
-      isMotivated = false;
-    }
+    const isMotivated = successful === 1;
     const userSession = this.users[userId];
 
     console.log(`\n--- Updating Strategy Weights ---`);
     console.log(`User ID: ${userId}`);
 
-    // Check if this is the first-time response
     if (userSession.first_time) {
       console.log("It's the user's first time. Only updating y_c and y_p.");
-
-      // Update only y_c and y_p based on success
       if (isMotivated) {
         userSession.y_c = 1;
         userSession.y_p = 0;
       }
-      // Ensure y_c and y_p are within valid bounds
       userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
       userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
 
-      // Update session data in Supabase without updating strategy weights
       try {
         await this.supabaseService.updateSessionData(userId, {
           y_c: userSession.y_c,
@@ -347,29 +357,28 @@ export class MapService {
       } catch (error) {
         console.error('Error updating y_c and y_p in Supabase:', error);
       }
-
-      return; // Skip updating strategy weights if it's the first time
+      return;
     }
 
-    //console.log(`Persuasion Successful: ${successful}`);
-    const isCentralRoute = userSession.y_c >= 0.5;
-
-    // Proceed to update strategy weights for subsequent attempts
+    const isCentralRoute = userSession.y_c > userSession.y_p;
     const strategyWeights = isCentralRoute
       ? userSession.strategyWeights.central
       : userSession.strategyWeights.peripheral;
 
     const index = isCentralRoute
-      ? userSession.strategyIndexChosen % 5 // 5 central strategies
-      : userSession.strategyIndexChosen % 6; // 6 peripheral strategies
+      ? userSession.strategyIndexChosen % 5
+      : userSession.strategyIndexChosen % 6;
 
     console.log(`Updating weight for strategy index: ${index}`);
     console.log(`Current Strategy Weights: ${JSON.stringify(strategyWeights)}`);
 
     const oldWeight = strategyWeights[index];
-    strategyWeights[index] =
-      0.1 * (1 - strategyWeights[index]) * (successful ? 1 : 0) -
-      0.9 * strategyWeights[index];
+    // Update weight: wJk(t + 1) = wJk(t) + ΔwJk
+    // where ΔwJk = α(1 - wJk)r - δwJk
+    const deltaWeight =
+      this.LEARNING_RATE * (1 - oldWeight) * (isMotivated ? 1 : 0) -
+      this.DECAY_RATE * oldWeight;
+    strategyWeights[index] = oldWeight + deltaWeight;
 
     console.log(
       `Updated strategy weight for index ${index}: ${oldWeight} -> ${strategyWeights[index]}`,
@@ -380,21 +389,29 @@ export class MapService {
       `Before adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
-    if (isCentralRoute) {
-      if (isMotivated) {
-        userSession.y_c += 0.2;
-        userSession.y_p -= 0.2;
+    // Use ROUTE_ADJUSTMENT for the changes
+    const ROUTE_ADJUSTMENT = this.ROUTE_ADJUSTMENT;
+
+    // Central Route first, then switch to Peripheral after 3 attempts
+    if (userSession.first_route_chosen === 'central') {
+      if (isCentralRoute) {
+        // First 3 attempts, decrease y_c by ROUTE_ADJUSTMENT and increase y_p by ROUTE_ADJUSTMENT
+        userSession.y_c -= ROUTE_ADJUSTMENT;
+        userSession.y_p += ROUTE_ADJUSTMENT;
       } else {
-        userSession.y_c -= 0.1;
-        userSession.y_p += 0.1;
+        // After switching to peripheral, decrement y_p by half of ROUTE_ADJUSTMENT on failure
+        userSession.y_p -= ROUTE_ADJUSTMENT / 2;
+        userSession.y_c += ROUTE_ADJUSTMENT / 2;
       }
     } else {
-      if (isMotivated) {
-        userSession.y_c -= 0.2;
-        userSession.y_p += 0.2;
+      // Peripheral route first, then switch to Central after 3 attempts
+      if (!isCentralRoute) {
+        userSession.y_p -= ROUTE_ADJUSTMENT;
+        userSession.y_c += ROUTE_ADJUSTMENT;
       } else {
-        userSession.y_c += 0.2;
-        userSession.y_p -= 0.2;
+        // After switching to central, decrement y_c by half of ROUTE_ADJUSTMENT on failure
+        userSession.y_c -= ROUTE_ADJUSTMENT / 2;
+        userSession.y_p += ROUTE_ADJUSTMENT / 2;
       }
     }
 
@@ -404,6 +421,16 @@ export class MapService {
     console.log(
       `After adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
+
+    // Check if it is the 6th attempt and unsuccessful
+    if (!isMotivated && userSession.persuasionAttempt === 6) {
+      console.log('6th attempt failed, marking strategy as ineligible.');
+      if (isCentralRoute) {
+        userSession.selectedStrategies.central[index] = 0; // Mark central strategy as ineligible
+      } else {
+        userSession.selectedStrategies.peripheral[index] = 0; // Mark peripheral strategy as ineligible
+      }
+    }
 
     // Update session data in Supabase
     try {

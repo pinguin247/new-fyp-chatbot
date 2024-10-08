@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GiftedChat, IMessage } from 'react-native-gifted-chat';
-import { Image, LogBox } from 'react-native';
+import { GiftedChat, IMessage, Bubble, Send } from 'react-native-gifted-chat';
+import { Image, LogBox, View, StyleSheet, SafeAreaView } from 'react-native';
 import { fetchResponse } from '@/lib/fetchResponse';
 import { fetchHistory } from '@/lib/fetchHistory';
 import { fetchRandomExercise } from '@/lib/fetchRandomExercise';
 import { createSession } from '@/lib/createSession';
 import { checkExistingSession } from '@/lib/checkExistingSession';
 import { saveMessage } from '@/lib/saveMessage';
-import { updateSession } from '@/lib/updateSession'; // Import updateSession
+import { updateSession } from '@/lib/updateSession';
 import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 
 LogBox.ignoreLogs([
   'Warning: Avatar: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.',
@@ -227,12 +228,46 @@ export default function Chatbot() {
   };
 
   // Render custom avatar for the chatbot
+  const renderBubble = (props: any) => {
+    return (
+      <Bubble
+        {...props}
+        wrapperStyle={{
+          right: {
+            backgroundColor: '#007AFF',
+          },
+          left: {
+            backgroundColor: '#E5E5EA',
+          },
+        }}
+        textStyle={{
+          right: {
+            color: '#FFFFFF',
+          },
+          left: {
+            color: '#000000',
+          },
+        }}
+      />
+    );
+  };
+
+  const renderSend = (props: any) => {
+    return (
+      <Send {...props}>
+        <View style={styles.sendButton}>
+          <Ionicons name="send" size={24} color="#007AFF" />
+        </View>
+      </Send>
+    );
+  };
+
   const renderAvatar = (props: any) => {
     if (props.currentMessage.user._id === 2) {
       return (
         <Image
           source={require('../../assets/images/icon.png')}
-          style={{ width: 40, height: 40, borderRadius: 20 }}
+          style={styles.botAvatar}
         />
       );
     }
@@ -240,12 +275,37 @@ export default function Chatbot() {
   };
 
   return (
-    <GiftedChat
-      messages={messages}
-      onSend={(newMessages) => handleSend(newMessages)}
-      user={{ _id: 1, name: userName || 'User' }} // Use user's full name in the chat if available
-      renderAvatar={renderAvatar}
-      isTyping={isLoading} // Show typing indicator when loading
-    />
+    <SafeAreaView style={styles.container}>
+      <GiftedChat
+        messages={messages}
+        onSend={(newMessages) => handleSend(newMessages)}
+        user={{ _id: 1, name: userName || 'User' }}
+        renderBubble={renderBubble}
+        renderSend={renderSend}
+        renderAvatar={renderAvatar}
+        isTyping={isLoading}
+        alwaysShowSend
+        scrollToBottom
+        infiniteScroll
+      />
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  sendButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    marginBottom: 5,
+  },
+  botAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+});

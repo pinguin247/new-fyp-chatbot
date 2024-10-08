@@ -69,6 +69,9 @@ export class ChatService {
     console.log('Processing chat for user:', userId, 'with message:', content);
 
     try {
+      // Clear the conversation history before processing new chat
+      this.conversationHistory = [];
+
       let userSession = await this.mapService.loadSessionFromSupabase(userId);
 
       // If no session found, create a new one
@@ -161,6 +164,16 @@ export class ChatService {
       }
 
       await this.mapService.incrementFailedPersuasionCount(userId);
+
+      if (userSession.persuasionAttempt >= 6) {
+        console.log(
+          `6th attempt reached for user ${userId}, sending give up message.`,
+        );
+        // Update strategy weights and handle 6th attempt give-up message
+        await this.mapService.updateStrategyWeights(userId, 0);
+        return this.handlePersuasionAttempts(userId, userSession, '');
+      }
+
       const route = this.mapService.decidePersuasionRoute(
         userSession.sessionID,
         userId,
@@ -196,13 +209,6 @@ export class ChatService {
       // Get response from GPT
       const botMessage = await this.generateGPTResponsewithChatHistory(prompt);
       this.conversationHistory.push({ role: 'assistant', content: botMessage });
-
-      // Save the assistant's message to Supabase
-      await this.supabaseService.insertChatHistory(
-        userId,
-        'assistant',
-        botMessage,
-      );
 
       // Handle 3 or 6 failed persuasion attempts
       return await this.handlePersuasionAttempts(
@@ -345,21 +351,21 @@ export class ChatService {
   }
 
   // Function to generate GPT-3 response
-  private async generateGPTResponse(prompt: string) {
-    try {
-      const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant' },
-          ...this.conversationHistory,
-          { role: 'user', content: prompt },
-        ],
-      });
-      return chatCompletion.choices[0].message.content;
-    } catch (error) {
-      throw new Error('Error while generating GPT response.');
-    }
-  }
+  // private async generateGPTResponse(prompt: string) {
+  //   try {
+  //     const chatCompletion = await this.openai.chat.completions.create({
+  //       model: 'gpt-3.5-turbo',
+  //       messages: [
+  //         { role: 'system', content: 'You are a helpful assistant' },
+  //         ...this.conversationHistory,
+  //         { role: 'user', content: prompt },
+  //       ],
+  //     });
+  //     return chatCompletion.choices[0].message.content;
+  //   } catch (error) {
+  //     throw new Error('Error while generating GPT response.');
+  //   }
+  // }
 
   private async generateGPTResponsewithChatHistory(prompt: string) {
     try {
@@ -467,7 +473,7 @@ export class ChatService {
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise}, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     } else {
       historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
     }
