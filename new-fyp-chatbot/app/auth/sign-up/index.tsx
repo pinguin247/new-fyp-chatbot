@@ -16,6 +16,12 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import { supabase } from '../../../lib/supabase';
+import {
+  requestUserPermission,
+  getFCMToken,
+  sendTokenToBackend,
+  setupFCMListeners,
+} from '../../../lib/fcmService';
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -36,34 +42,52 @@ export default function SignUp() {
 
       const userInfo = await GoogleSignin.signIn();
       console.log(JSON.stringify(userInfo, null, 2));
+
       if (userInfo.idToken) {
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: userInfo.idToken,
         });
+
         console.log(error, data);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.user) {
+          // Set up FCM after successful Google sign-in
+          const hasPermission = await requestUserPermission();
+          if (hasPermission) {
+            const fcmToken = await getFCMToken();
+            if (fcmToken) {
+              await sendTokenToBackend(data.user.id, fcmToken);
+            }
+            setupFCMListeners();
+          } else {
+            console.log('Failed to get notification permission');
+          }
+
+          router.replace('/home'); // Navigate to home
+        }
       } else {
-        throw new Error('no ID token present!');
+        throw new Error('No ID token present!');
       }
-      router.replace('/home'); // Navigate to home
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         // user cancelled the login flow
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        console.error('User cancelled the login flow:', error);
       } else if (error.code === statusCodes.IN_PROGRESS) {
         // operation (e.g. sign in) is in progress already
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        console.error('Sign in already in progress:', error);
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         // play services not available or outdated
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        console.error('Play services not available:', error);
       } else {
         // some other error happened
-        console.error(error);
-        ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
+        console.error('Google Sign-In failed:', error);
       }
+      ToastAndroid.show('Google Sign-In failed', ToastAndroid.LONG);
     }
   }
 
@@ -72,6 +96,25 @@ export default function SignUp() {
       headerShown: false,
     });
   }, [navigation]);
+
+  const setupFCM = async (userId: string) => {
+    try {
+      const hasPermission = await requestUserPermission();
+      if (hasPermission) {
+        const fcmToken = await getFCMToken();
+        if (fcmToken) {
+          await sendTokenToBackend(userId, fcmToken);
+        }
+        setupFCMListeners();
+      } else {
+        console.log('Failed to get notification permission');
+      }
+    } catch (error) {
+      console.error('Error setting up FCM:', error);
+      ToastAndroid.show('Failed to set up notifications', ToastAndroid.SHORT);
+      // Optionally, you can add more specific error handling here
+    }
+  };
 
   const onCreateAccount = async () => {
     if (email === '' || password === '' || fullName === '') {
@@ -97,6 +140,7 @@ export default function SignUp() {
 
       if (data.user) {
         console.log(data.user);
+        await setupFCM(data.user.id);
         router.replace('/home');
       }
     } catch (error: any) {

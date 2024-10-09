@@ -16,6 +16,12 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import { supabase } from '../../../lib/supabase';
+import {
+  requestUserPermission,
+  getFCMToken,
+  sendTokenToBackend,
+  setupFCMListeners,
+} from '../../../lib/fcmService';
 
 export default function SignIn() {
   const navigation = useNavigation();
@@ -63,6 +69,7 @@ export default function SignIn() {
               );
             } else {
               console.log('User logged in:', signInData);
+              await setupFCMForUser(signInData.user.id);
               router.replace('/home'); // Navigate to home
             }
           } else {
@@ -72,6 +79,7 @@ export default function SignIn() {
         } else {
           // New user or existing user successfully signed in
           console.log('User signed in or up:', data);
+          await setupFCMForUser(data.user.id);
           router.replace('/home'); // Navigate to home
         }
       } else {
@@ -103,6 +111,25 @@ export default function SignIn() {
     });
   }, [navigation]);
 
+  async function setupFCMForUser(userId: string) {
+    try {
+      const hasPermission = await requestUserPermission();
+      if (hasPermission) {
+        const fcmToken = await getFCMToken();
+        if (fcmToken) {
+          await sendTokenToBackend(userId, fcmToken);
+        }
+        setupFCMListeners();
+      } else {
+        console.log('Failed to get notification permission');
+      }
+    } catch (error) {
+      console.error('Error setting up FCM:', error);
+      ToastAndroid.show('Failed to set up notifications', ToastAndroid.SHORT);
+      // Optionally, you can add more specific error handling here
+    }
+  }
+
   const onSignIn = async () => {
     if (email === '' || password === '') {
       console.log('Input fields cannot be empty');
@@ -121,6 +148,7 @@ export default function SignIn() {
 
       if (data.user) {
         console.log(data.user);
+        await setupFCMForUser(data.user.id);
         router.replace('/home');
       }
     } catch (error) {

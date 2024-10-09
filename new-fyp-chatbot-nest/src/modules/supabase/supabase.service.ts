@@ -449,4 +449,19 @@ export class SupabaseService {
       throw new Error('Failed to allocate exercise');
     }
   }
+
+  async getFCMTokenForUser(userId: string): Promise<string | null> {
+    const { data, error } = await this.supabase
+      .from('user_fcm_tokens')
+      .select('fcm_token')
+      .eq('user_id', userId)
+      .maybeSingle(); // Use maybeSingle() instead of single()
+
+    if (error) {
+      console.error('Error fetching FCM token:', error);
+      return null;
+    }
+
+    return data?.fcm_token || null;
+  }
 }
