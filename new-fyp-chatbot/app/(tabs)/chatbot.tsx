@@ -9,6 +9,7 @@ import { checkExistingSession } from '@/lib/checkExistingSession';
 import { saveMessage } from '@/lib/saveMessage';
 import { updateSession } from '@/lib/updateSession';
 import { supabase } from '@/lib/supabase';
+import { fetchExerciseReport } from '@/lib/fetchExerciseReport';
 import { Ionicons } from '@expo/vector-icons';
 
 LogBox.ignoreLogs([
@@ -75,35 +76,69 @@ export default function Chatbot() {
         },
       }));
 
-      // Sort the history by createdAt in descending order
-      formattedHistory.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      // Sort history from oldest to newest
+      formattedHistory.sort((a, b) => {
+        const timeA =
+          a.createdAt instanceof Date ? a.createdAt.getTime() : a.createdAt;
+        const timeB =
+          b.createdAt instanceof Date ? b.createdAt.getTime() : b.createdAt;
+        return timeA - timeB;
+      });
 
-      // Declare the starting message with the user's full name
-      const startingMessage: IMessage = {
-        _id: Math.round(Math.random() * 1000000),
-        text: `Hi ${userName}! How are you feeling today? Let me know, and I can help you with your exercise routine!`,
-        createdAt: new Date(),
-        user: {
-          _id: 2,
-          name: 'Chatbot',
-          avatar: 'https://placekitten.com/200/300',
-        },
-      };
-
-      // Always send the two messages when the page first loads
       if (isFirstLoad.current) {
+        const endDate = new Date('2024-06-07');
+        const startDate = new Date('2024-06-01');
+        const report = await fetchExerciseReport(
+          userId,
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0],
+        );
+
+        const newMessages: IMessage[] = [];
+
+        if (report) {
+          const reportMessage: IMessage = {
+            _id: `report-${Date.now()}-1`,
+            text: `Here's your exercise report for the week of ${startDate.toDateString()} to ${endDate.toDateString()}:
+      
+      - Total Exercise Duration: ${report.totalExerciseDuration} minutes
+      - Average Heart Rate: ${report.avgHeartRate.toFixed(1)} bpm
+      - Number of Exercise Sessions: ${report.exerciseCount}
+      - Total Time in Moderate Intensity: ${report.totalModerateIntensity.toFixed(1)} minutes
+      - Total Time in Vigorous Intensity: ${report.totalVigorousIntensity.toFixed(1)} minutes
+      
+      Great job on your progress!`,
+            createdAt: new Date(),
+            user: {
+              _id: 2,
+              name: 'Chatbot',
+              avatar: 'https://placekitten.com/200/300',
+            },
+          };
+          newMessages.push(reportMessage);
+          await saveMessage(userId, reportMessage.text, 'assistant');
+        }
+
+        const startingMessage: IMessage = {
+          _id: `greeting-${Date.now()}-2`,
+          text: `Hi ${userName}! How are you feeling today? Let me know, and I can help you with your exercise routine!`,
+          createdAt: new Date(Date.now() + 1), // Ensure this is slightly later than the report message
+          user: {
+            _id: 2,
+            name: 'Chatbot',
+            avatar: 'https://placekitten.com/200/300',
+          },
+        };
+        newMessages.push(startingMessage);
         await saveMessage(userId, startingMessage.text, 'assistant');
-        setMessages([startingMessage, ...formattedHistory]);
 
-        // Commented out: Always recommend an exercise when the page first loads
-        // await recommendExercise(userId);
+        // Reverse newMessages to get the correct order (oldest first)
+        newMessages.reverse();
 
-        isFirstLoad.current = false; // Set flag to false after first load
+        // Combine chat history with new messages in the correct order
+        setMessages(GiftedChat.append(formattedHistory, newMessages));
+        isFirstLoad.current = false;
       } else {
-        // If not the first load, just load the chat history without extra messages
         setMessages(formattedHistory);
       }
     };
@@ -286,7 +321,7 @@ export default function Chatbot() {
         isTyping={isLoading}
         alwaysShowSend
         scrollToBottom
-        infiniteScroll
+        inverted={true} // This is the default, but we're setting it explicitly for clarity
       />
     </SafeAreaView>
   );

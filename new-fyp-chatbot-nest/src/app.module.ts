@@ -14,6 +14,7 @@ import { PatientService } from './modules/patient/patient.service';
 import { UserAvailabilityService } from './modules/userAvailability/user_availability.service';
 import { ExerciseAllocationService } from './modules/exercise/exercise_allocation.service';
 import { FirebaseService } from './modules/notifications/firebase.service';
+import { ExerciseSummaryService } from './modules/exercise/exercise_summary.service';
 import { NotificationController } from './modules/notifications/notifications.controller';
 
 import { ConfigModule } from '@nestjs/config';
@@ -43,6 +44,7 @@ import { ConfigModule } from '@nestjs/config';
     UserAvailabilityService,
     ExerciseAllocationService,
     FirebaseService,
+    ExerciseSummaryService,
   ],
 })
 export class AppModule {}

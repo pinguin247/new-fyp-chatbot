@@ -3,8 +3,9 @@ import OpenAI from 'openai';
 import { SupabaseService } from '../supabase/supabase.service';
 import { MapService } from '../map/map.service';
 import { PatientService } from '../patient/patient.service';
-import { UserAvailabilityService } from '../userAvailability/user_availability.service';
 import { ExerciseAllocationService } from '../exercise/exercise_allocation.service';
+import { ExerciseSummaryService } from '../exercise/exercise_summary.service';
+
 import { DateTime } from 'luxon';
 @Injectable()
 export class ChatService {
@@ -18,8 +19,8 @@ export class ChatService {
     private readonly supabaseService: SupabaseService, // Inject SupabaseService
     private readonly mapService: MapService,
     private readonly patientService: PatientService,
-    private readonly userAvailabilityService: UserAvailabilityService,
     private readonly exerciseAllocationService: ExerciseAllocationService,
+    private readonly eerciseSummaryService: ExerciseSummaryService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
