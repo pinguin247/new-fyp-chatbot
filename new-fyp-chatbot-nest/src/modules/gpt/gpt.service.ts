@@ -325,7 +325,7 @@ export class ChatService {
     );
 
     // Update the strategy weights to reflect unsuccessful persuasion
-    await this.mapService.updateStrategyWeights(userId, 0);
+    await this.mapService.updateStrategyWeights(userId, 1);
 
     return { response: noSlotResponse };
   }

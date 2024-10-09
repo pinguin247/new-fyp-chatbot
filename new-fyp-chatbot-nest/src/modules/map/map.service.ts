@@ -373,53 +373,68 @@ export class MapService {
     console.log(`Current Strategy Weights: ${JSON.stringify(strategyWeights)}`);
 
     const oldWeight = strategyWeights[index];
-    // Update weight: wJk(t + 1) = wJk(t) + ΔwJk
-    // where ΔwJk = α(1 - wJk)r - δwJk
-    const deltaWeight =
-      this.LEARNING_RATE * (1 - oldWeight) * (isMotivated ? 1 : 0) -
-      this.DECAY_RATE * oldWeight;
-    strategyWeights[index] = oldWeight + deltaWeight;
+    let newWeight;
+
+    if (isMotivated) {
+      newWeight = oldWeight + this.LEARNING_RATE * (1 - oldWeight);
+      if (isCentralRoute) {
+        userSession.y_c = Math.min(1, userSession.y_c + 0.2);
+        userSession.y_p = Math.max(0, userSession.y_p - 0.2);
+      } else {
+        userSession.y_c = Math.max(0, userSession.y_c - 0.2);
+        userSession.y_p = Math.min(1, userSession.y_p + 0.2);
+      }
+    } else {
+      // Update weight: wJk(t + 1) = wJk(t) + ΔwJk
+      // where ΔwJk = α(1 - wJk)r - δwJk
+      const deltaWeight =
+        this.LEARNING_RATE * (1 - oldWeight) * (isMotivated ? 1 : 0) -
+        this.DECAY_RATE * oldWeight;
+      newWeight = oldWeight + deltaWeight;
+
+      // Adjust route activation values
+      console.log(
+        `Before adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+      );
+
+      // Use ROUTE_ADJUSTMENT for the changes
+      const ROUTE_ADJUSTMENT = this.ROUTE_ADJUSTMENT;
+
+      // Central Route first, then switch to Peripheral after 3 attempts
+      if (userSession.first_route_chosen === 'central') {
+        if (isCentralRoute) {
+          // First 3 attempts, decrease y_c by ROUTE_ADJUSTMENT and increase y_p by ROUTE_ADJUSTMENT
+          userSession.y_c -= ROUTE_ADJUSTMENT;
+          userSession.y_p += ROUTE_ADJUSTMENT;
+        } else {
+          // After switching to peripheral, decrement y_p by half of ROUTE_ADJUSTMENT on failure
+          userSession.y_p -= ROUTE_ADJUSTMENT / 2;
+          userSession.y_c += ROUTE_ADJUSTMENT / 2;
+        }
+      } else {
+        // Peripheral route first, then switch to Central after 3 attempts
+        if (!isCentralRoute) {
+          userSession.y_p -= ROUTE_ADJUSTMENT;
+          userSession.y_c += ROUTE_ADJUSTMENT;
+        } else {
+          // After switching to central, decrement y_c by half of ROUTE_ADJUSTMENT on failure
+          userSession.y_c -= ROUTE_ADJUSTMENT / 2;
+          userSession.y_p += ROUTE_ADJUSTMENT / 2;
+        }
+      }
+
+      userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
+      userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
+
+      console.log(
+        `After adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
+      );
+    }
+
+    strategyWeights[index] = newWeight;
 
     console.log(
       `Updated strategy weight for index ${index}: ${oldWeight} -> ${strategyWeights[index]}`,
-    );
-
-    // Adjust route activation values
-    console.log(
-      `Before adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
-    );
-
-    // Use ROUTE_ADJUSTMENT for the changes
-    const ROUTE_ADJUSTMENT = this.ROUTE_ADJUSTMENT;
-
-    // Central Route first, then switch to Peripheral after 3 attempts
-    if (userSession.first_route_chosen === 'central') {
-      if (isCentralRoute) {
-        // First 3 attempts, decrease y_c by ROUTE_ADJUSTMENT and increase y_p by ROUTE_ADJUSTMENT
-        userSession.y_c -= ROUTE_ADJUSTMENT;
-        userSession.y_p += ROUTE_ADJUSTMENT;
-      } else {
-        // After switching to peripheral, decrement y_p by half of ROUTE_ADJUSTMENT on failure
-        userSession.y_p -= ROUTE_ADJUSTMENT / 2;
-        userSession.y_c += ROUTE_ADJUSTMENT / 2;
-      }
-    } else {
-      // Peripheral route first, then switch to Central after 3 attempts
-      if (!isCentralRoute) {
-        userSession.y_p -= ROUTE_ADJUSTMENT;
-        userSession.y_c += ROUTE_ADJUSTMENT;
-      } else {
-        // After switching to central, decrement y_c by half of ROUTE_ADJUSTMENT on failure
-        userSession.y_c -= ROUTE_ADJUSTMENT / 2;
-        userSession.y_p += ROUTE_ADJUSTMENT / 2;
-      }
-    }
-
-    userSession.y_c = Math.max(0, Math.min(1, userSession.y_c));
-    userSession.y_p = Math.max(0, Math.min(1, userSession.y_p));
-
-    console.log(
-      `After adjustment: y_c = ${userSession.y_c}, y_p = ${userSession.y_p}`,
     );
 
     // Check if it is the 6th attempt and unsuccessful
