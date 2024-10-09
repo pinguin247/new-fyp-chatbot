@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash, Search } from "lucide-react";
+import { Trash, Search, Bell } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
@@ -29,37 +29,47 @@ function PatientListTable({ reload, setReload }) {
 
   const CustomButtons = (props) => {
     return (
-      <AlertDialog>
-        <AlertDialogTrigger>
-          <Button variant="destructive">
-            <Trash />
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              patient's data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                toast("Patient Deleted Successfully");
-                setReload(true);
-              }}
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="flex gap-2">
+        <AlertDialog>
+          <AlertDialogTrigger>
+            <Button variant="destructive" size="sm">
+              <Trash className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the
+                patient's data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  toast("Patient Deleted Successfully");
+                  setReload(true);
+                }}
+              >
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => sendNotification(props.data.patient_id)}
+        >
+          <Bell className="h-4 w-4" />
+        </Button>
+      </div>
     );
   };
 
   const [colDefs, setColDefs] = useState([
+    { field: "patient_id", headerName: "Patient ID", hide: true },
     { field: "full_name", headerName: "Name", filter: true },
     { field: "email", headerName: "Email", filter: true },
     { field: "phone_number", headerName: "Phone Number", filter: true },
@@ -71,7 +81,12 @@ function PatientListTable({ reload, setReload }) {
       filter: true,
     },
     { field: "disability_level", headerName: "Disability Level", filter: true },
-    { field: "action", headerName: "Action", cellRenderer: CustomButtons },
+    {
+      field: "action",
+      headerName: "Action",
+      cellRenderer: CustomButtons,
+      width: 100,
+    },
   ]);
 
   const fetchPatients = async () => {
@@ -90,6 +105,37 @@ function PatientListTable({ reload, setReload }) {
       setError(error.message || "Failed to fetch patients data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendNotification = async (patientId) => {
+    try {
+      const response = await fetch(
+        `http://${window.location.hostname}:${
+          process.env.NEXT_PUBLIC_API_PORT || 3000
+        }/notifications/send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: patientId, // Using patientId here
+            title: "FitBuddy: Exercise Time!",
+            body: "Click on me to find something exciting to do. Get up and let's get moving!",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success("Notification sent successfully");
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      toast.error("Failed to send notification");
     }
   };
 
