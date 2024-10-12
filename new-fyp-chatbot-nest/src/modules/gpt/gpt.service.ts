@@ -38,8 +38,7 @@ export class ChatService {
   };
 
   async createNewSession(userId: string, exerciseId: string) {
-    console.log(`Creating a new session for user: ${userId}`);
-
+    //console.log(`Creating a new session for user: ${userId}`);
     try {
       // Fetch exercise details
       const exercise = await this.supabaseService.getExerciseById(exerciseId);
@@ -76,7 +75,7 @@ export class ChatService {
   }
 
   async chatWithGPT(userId: string, content: string) {
-    console.log('Processing chat for user:', userId, 'with message:', content);
+    //console.log('Processing chat for user:', userId, 'with message:', content);
 
     try {
       // Clear the conversation history before processing new chat
@@ -144,9 +143,9 @@ export class ChatService {
 
         let prompt;
         if (motivationResult === 1) {
-          prompt = `The user responded to the previous message with: "${content}". The user is feeling motivated. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words.`;
+          prompt = `The user responded to the previous message with: "${content}". Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words. Do not include any quotes in the message.`;
         } else {
-          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words.`;
+          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words. Do not include any quotes in the message.`;
         }
 
         // Log the prompt that will be sent to GPT
@@ -338,9 +337,9 @@ export class ChatService {
     botMessage: string,
   ) {
     // On the 3rd attempt, recommend a new exercise and use a dynamic prompt
-    if (userSession.persuasionAttempt === 3) {
+    if (userSession.persuasionAttempt === 2) {
       console.log(
-        `3rd attempt reached for user ${userId}, recommending a new exercise.`,
+        `2rd attempt reached for user ${userId}, recommending a new exercise.`,
       );
 
       // Fetch a new exercise
@@ -386,7 +385,7 @@ export class ChatService {
         conversationHistory,
       );
 
-      console.log(`Generated prompt for 3rd attempt: ${prompt}`);
+      //console.log(`Generated prompt for 3rd attempt: ${prompt}`);
 
       // Get response from GPT
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
@@ -409,7 +408,7 @@ export class ChatService {
     }
 
     // Give up after 6 failed attempts
-    if (userSession.persuasionAttempt >= 6) {
+    if (userSession.persuasionAttempt >= 4) {
       const giveUpMessage =
         "Alright, it seems you're not interested right now. Let's talk later!";
       this.conversationHistory.push({
@@ -422,29 +421,12 @@ export class ChatService {
         'assistant',
         giveUpMessage,
       );
-      console.log('Giving up after 6 failed attempts.');
+      console.log('Giving up after 4 failed attempts.');
       return { response: giveUpMessage };
     }
 
     return { response: botMessage };
   }
-
-  // Function to generate GPT-3 response
-  // private async generateGPTResponse(prompt: string) {
-  //   try {
-  //     const chatCompletion = await this.openai.chat.completions.create({
-  //       model: 'gpt-3.5-turbo',
-  //       messages: [
-  //         { role: 'system', content: 'You are a helpful assistant' },
-  //         ...this.conversationHistory,
-  //         { role: 'user', content: prompt },
-  //       ],
-  //     });
-  //     return chatCompletion.choices[0].message.content;
-  //   } catch (error) {
-  //     throw new Error('Error while generating GPT response.');
-  //   }
-  // }
 
   private async generateGPTResponsewithChatHistory(prompt: string) {
     try {
@@ -551,9 +533,9 @@ export class ChatService {
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
     } else {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
     }
 
     return historyPrompt;
