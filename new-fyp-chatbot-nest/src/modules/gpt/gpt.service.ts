@@ -144,9 +144,9 @@ export class ChatService {
 
         let prompt;
         if (motivationResult === 1) {
-          prompt = `The user responded to the previous message with: "${content}". The user is feeling motivated. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise.`;
+          prompt = `The user responded to the previous message with: "${content}". The user is feeling motivated. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words.`;
         } else {
-          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise.`;
+          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words.`;
         }
 
         // Log the prompt that will be sent to GPT
@@ -256,7 +256,7 @@ export class ChatService {
       );
 
       // Create a prompt for GPT to generate a thank you message with resources and success message
-      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras)`;
+      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras, each para 70 words)`;
 
       // Get the GPT response for the personalized message
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
@@ -293,7 +293,7 @@ export class ChatService {
     }
 
     // If no free slots are available, modify the prompt
-    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational.`;
+    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words.`;
 
     // Get the GPT response for the no-slot scenario
     const noSlotResponse =
@@ -551,9 +551,9 @@ export class ChatService {
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words.`;
     } else {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words.`;
     }
 
     return historyPrompt;
@@ -598,7 +598,7 @@ export class ChatService {
 
     // Complete the prompt using the strategy example and new exercise
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
-    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well.`;
+    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words.`;
 
     return historyPrompt;
   }
