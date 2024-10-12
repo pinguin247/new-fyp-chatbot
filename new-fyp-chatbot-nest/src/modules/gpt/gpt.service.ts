@@ -149,7 +149,7 @@ export class ChatService {
         }
 
         // Log the prompt that will be sent to GPT
-        console.log('Sending the following prompt to GPT API:', prompt);
+        //console.log('Sending the following prompt to GPT API:', prompt);
 
         // Get the response from GPT
         const botMessage =

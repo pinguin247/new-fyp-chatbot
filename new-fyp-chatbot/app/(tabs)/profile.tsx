@@ -22,6 +22,9 @@ import { fetchUserProfile } from '../../lib/fetchUserProfile';
 import { router } from 'expo-router';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { Colors } from '@/constants/Colors';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
+import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 export default function Profile() {
   const [loading, setLoading] = useState(false);
@@ -39,8 +42,10 @@ export default function Profile() {
   ] = useState(false);
 
   const [availableDay, setAvailableDay] = useState('Monday');
-  const [startTime, setStartTime] = useState('06:00');
-  const [endTime, setEndTime] = useState('07:00');
+  const [startTime, setStartTime] = useState(new Date()); // Store time as Date object
+  const [endTime, setEndTime] = useState(new Date());
+  const [isStartPickerVisible, setIsStartPickerVisible] = useState(false);
+  const [isEndPickerVisible, setIsEndPickerVisible] = useState(false);
   const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseIntensity, setNewExerciseIntensity] = useState('moderate');
@@ -52,6 +57,27 @@ export default function Profile() {
     emailNotifications: true,
     pushNotifications: false,
   });
+
+  // Handles when the start time is selected
+  const handleStartTimeChange = (
+    event: DateTimePickerEvent, // Correct type for event
+    selectedTime?: Date, // selectedTime can be Date or undefined
+  ) => {
+    if (selectedTime) {
+      setStartTime(selectedTime); // Update the state with the selected time
+    }
+    setIsStartPickerVisible(false); // Close the picker
+  };
+
+  const handleEndTimeChange = (
+    event: DateTimePickerEvent, // Correct type for event
+    selectedTime?: Date, // selectedTime can be Date or undefined
+  ) => {
+    if (selectedTime) {
+      setEndTime(selectedTime); // Update the state with the selected time
+    }
+    setIsEndPickerVisible(false); // Close the picker
+  };
 
   useEffect(() => {
     const fetchSessionAndProfile = async () => {
@@ -201,39 +227,57 @@ export default function Profile() {
     try {
       console.log('Saving exercise availability...'); // Debugging log
       setLoading(true);
+
       if (!profileId) {
         throw new Error('Profile ID is not available.');
       }
 
+      // Extract only the time portion (HH:mm:ss) for TIME fields in the database
+      const startTimeFormatted = startTime.toTimeString().split(' ')[0]; // "HH:mm:ss"
+      const endTimeFormatted = endTime.toTimeString().split(' ')[0]; // "HH:mm:ss"
+
       const newExerciseRecord = {
         profile_id: profileId,
         day_of_week: availableDay,
-        start_time: startTime,
-        end_time: endTime,
-        created_at: new Date(),
-        updated_at: new Date(),
+        start_time: startTimeFormatted, // Send only time
+        end_time: endTimeFormatted, // Send only time
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      console.log('New exercise record:', newExerciseRecord); // Log record to debug
+
+      // Insert into Supabase and log the response in detail
+      const { data, error } = await supabase
         .from('user_availability')
         .insert(newExerciseRecord);
 
+      console.log('Supabase insert response:', { data, error }); // Log the response
+
+      // If error is not null, log it and throw it to see details
       if (error) {
-        throw error;
+        console.error('Supabase insert error:', error); // Log the error details
+        throw new Error(
+          error.message || 'Unknown error during Supabase insert',
+        );
       }
 
+      // If no error, show the toast message
       ToastAndroid.show(
         'Exercise availability saved successfully',
         ToastAndroid.SHORT,
       );
-      setExerciseAvailabilityModalVisible(false);
+
+      // Delay modal closure to ensure toast is visible
+      setTimeout(() => {
+        setExerciseAvailabilityModalVisible(false);
+      }, 500); // 500ms delay to ensure toast is visible
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Error saving exercise availability:', error.message); // Debugging log
-        Alert.alert('Error', error.message);
-      }
+      // Log error and show the user an alert
+      console.error('Error saving exercise availability:', error); // Debugging log
+      Alert.alert('Error', error.message); // Show the error message to the user
     } finally {
-      setLoading(false);
+      setLoading(false); // Stop the loading spinner or indicator
     }
   };
 
@@ -512,22 +556,44 @@ export default function Profile() {
             </Picker>
 
             <Text style={styles.modalLabel}>Start Time</Text>
-            <Input
-              value={startTime}
-              onChangeText={(text) => setStartTime(text)}
-              keyboardType="number-pad"
-              containerStyle={styles.inputContainer}
-              inputStyle={styles.inputText}
-            />
+            <TouchableOpacity
+              onPress={() => setIsStartPickerVisible(true)}
+              style={styles.button}
+            >
+              <Text style={styles.buttonText}>
+                {format(startTime, 'HH:mm')}
+              </Text>
+              {/* Display formatted time */}
+            </TouchableOpacity>
+
+            {isStartPickerVisible && (
+              <DateTimePicker
+                value={startTime} // Date object
+                mode="time" // Set to 'time' to make it a TimePicker
+                is24Hour={true} // 24-hour format
+                display="default"
+                onChange={handleStartTimeChange} // Function to handle time change
+              />
+            )}
 
             <Text style={styles.modalLabel}>End Time</Text>
-            <Input
-              value={endTime}
-              onChangeText={(text) => setEndTime(text)}
-              keyboardType="number-pad"
-              containerStyle={styles.inputContainer}
-              inputStyle={styles.inputText}
-            />
+            <TouchableOpacity
+              onPress={() => setIsEndPickerVisible(true)}
+              style={styles.button}
+            >
+              <Text style={styles.buttonText}>{format(endTime, 'HH:mm')}</Text>
+              {/* Display formatted time */}
+            </TouchableOpacity>
+
+            {isEndPickerVisible && (
+              <DateTimePicker
+                value={endTime} // Date object
+                mode="time" // Set to 'time' to make it a TimePicker
+                is24Hour={true} // 24-hour format
+                display="default"
+                onChange={handleEndTimeChange} // Function to handle time change
+              />
+            )}
 
             <Button
               title="Save"
@@ -798,5 +864,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  button: {
+    backgroundColor: 'transparent', // No background, making it an outline button
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    alignItems: 'center', // Center the text inside the button
+    justifyContent: 'center', // Align the text vertically
+    marginVertical: 10, // Some spacing between buttons or elements
+    borderWidth: 2, // The width of the outline
+    borderColor: '#007AFF', // Some spacing between buttons or elements
+  },
+  buttonText: {
+    color: '#007AFF', // Match the text color to the outline color
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
