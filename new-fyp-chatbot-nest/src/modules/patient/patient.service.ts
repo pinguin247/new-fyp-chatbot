@@ -113,7 +113,6 @@ export class PatientService {
       if (error) {
         throw new Error(`Error fetching doctor inputs: ${error.message}`);
       }
-      console.log(data);
 
       return data; // Return the fetched data directly
     } catch (error) {

@@ -123,7 +123,7 @@ export class SupabaseService {
         throw new Error(`Profile with user ID ${userId} does not exist.`);
       }
 
-      console.log('Profile fetched:', profile);
+      //console.log('Profile fetched:', profile);
 
       // Fetch chat history for the correct profile id and order by created_at
       const { data, error } = await this.supabase
@@ -137,7 +137,7 @@ export class SupabaseService {
         throw new Error(`Failed to fetch chat history: ${error.message}`);
       }
 
-      console.log('Chat history fetched:', data);
+      //console.log('Chat history fetched:', data);
 
       return data;
     } catch (error) {
@@ -211,10 +211,10 @@ export class SupabaseService {
 
   async updateSessionData(userId: string, sessionData: any) {
     try {
-      console.log(
-        `Updating session for userId: ${userId} with data:`,
-        sessionData,
-      );
+      // console.log(
+      //   `Updating session for userId: ${userId} with data:`,
+      //   sessionData,
+      // );
 
       const { error } = await this.supabase
         .from('user_sessions')
@@ -226,7 +226,7 @@ export class SupabaseService {
         return { success: false, message: error.message };
       }
 
-      console.log('Session updated successfully in Supabase.');
+      //console.log('Session updated successfully in Supabase.');
       return { success: true };
     } catch (err) {
       console.error('Update session in Supabase failed:', err.message);
@@ -262,7 +262,7 @@ export class SupabaseService {
         throw new Error('Exercise ID is undefined');
       }
 
-      console.log('Fetching exercise with ID:', exerciseId); // Log the exerciseId for debugging
+      //console.log('Fetching exercise with ID:', exerciseId); // Log the exerciseId for debugging
 
       const { data, error } = await this.supabase
         .from('exercises')

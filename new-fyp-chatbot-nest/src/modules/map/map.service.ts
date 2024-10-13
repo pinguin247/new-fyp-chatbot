@@ -22,7 +22,7 @@ export class MapService {
   private users: Record<string, UserSession> = {};
   private readonly LEARNING_RATE = 0.1;
   private readonly DECAY_RATE = 0.9;
-  private readonly ROUTE_ADJUSTMENT = 0.2;
+  private readonly ROUTE_ADJUSTMENT = 0.3;
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
@@ -90,7 +90,10 @@ export class MapService {
   async loadSessionFromSupabase(userId: string) {
     // Check if the session exists in the cache and has a session ID
     if (this.users[userId] && this.users[userId].sessionID) {
-      console.log(`Session for userId ${userId} found in cache.`);
+      console.log(
+        '\n--- Persuasion Attempt:',
+        this.users[userId].persuasionAttempt + 1,
+      );
       return this.users[userId]; // Return from cache if available and sessionID exists
     }
 
@@ -112,7 +115,7 @@ export class MapService {
           failedPersuasionCount: data.failed_persuasion_count || 0,
           first_time: data.first_time !== undefined ? data.first_time : true, // Fetch first_time, default to true if not set
         };
-        console.log(`Loaded session for userId: ${userId}`);
+        //console.log(`Loaded session for userId: ${userId}`);
         return this.users[userId];
       }
       return null;
@@ -183,7 +186,6 @@ export class MapService {
     const userSession = this.users[userId];
 
     console.log(`\n--- Deciding Persuasion Route ---`);
-    console.log(`User ID: ${userId}`);
     console.log(`Initial motivation (x_m): ${x_m}`);
     console.log(`Persuasion Attempt: ${userSession.persuasionAttempt}`);
 
@@ -278,7 +280,7 @@ export class MapService {
     const isCentralRoute = userSession.y_c > userSession.y_p;
 
     console.log(`\n--- Getting Current Strategy ---`);
-    console.log(`User ID: ${userId}`);
+    //console.log(`User ID: ${userId}`);
     console.log(`Current Route: ${isCentralRoute ? 'Central' : 'Peripheral'}`);
 
     const centralStrategies = [
@@ -327,6 +329,8 @@ export class MapService {
     // Update strategyIndexChosen in session
     userSession.strategyIndexChosen = strategyIndex;
 
+    console.log(`\n--------------------`);
+
     return chosenStrategy;
   }
 
@@ -335,7 +339,6 @@ export class MapService {
     const userSession = this.users[userId];
 
     console.log(`\n--- Updating Strategy Weights ---`);
-    console.log(`User ID: ${userId}`);
 
     if (userSession.first_time) {
       console.log("It's the user's first time. Only updating y_c and y_p.");
@@ -378,11 +381,11 @@ export class MapService {
     if (isMotivated) {
       newWeight = oldWeight + this.LEARNING_RATE * (1 - oldWeight);
       if (isCentralRoute) {
-        userSession.y_c = Math.min(1, userSession.y_c + 0.2);
-        userSession.y_p = Math.max(0, userSession.y_p - 0.2);
+        userSession.y_c = Math.min(1, userSession.y_c + this.ROUTE_ADJUSTMENT);
+        userSession.y_p = Math.max(0, userSession.y_p - this.ROUTE_ADJUSTMENT);
       } else {
-        userSession.y_c = Math.max(0, userSession.y_c - 0.2);
-        userSession.y_p = Math.min(1, userSession.y_p + 0.2);
+        userSession.y_c = Math.max(0, userSession.y_c - this.ROUTE_ADJUSTMENT);
+        userSession.y_p = Math.min(1, userSession.y_p + this.ROUTE_ADJUSTMENT);
       }
     } else {
       // Update weight: wJk(t + 1) = wJk(t) + ΔwJk
@@ -438,7 +441,7 @@ export class MapService {
     );
 
     // Check if it is the 6th attempt and unsuccessful
-    if (!isMotivated && userSession.persuasionAttempt === 6) {
+    if (!isMotivated && userSession.persuasionAttempt === 4) {
       console.log('6th attempt failed, marking strategy as ineligible.');
       if (isCentralRoute) {
         userSession.selectedStrategies.central[index] = 0; // Mark central strategy as ineligible
