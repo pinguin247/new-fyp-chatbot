@@ -162,11 +162,50 @@ export class ChatService {
       // For subsequent messages, use the existing flow
       console.log('Handling subsequent user message...');
 
-      // Determine user's motivation level
+      // Determine user's motivation level and if they want a new exercise
+      const { motivation: x_m, wantNewExercise } =
+        await this.determineUserMotivation(content);
 
-      const x_m = await this.determineUserMotivation(content);
+      console.log(
+        `Determined motivation: ${x_m}, Want new exercise: ${wantNewExercise}`,
+      );
 
-      console.log(`Determined motivation: ${x_m}`);
+      if (wantNewExercise) {
+        // Recommend a new exercise without changing the persuasion strategy
+        const newExercise = await this.supabaseService.fetchRandomExercise();
+        console.log(`Recommending new exercise: ${newExercise.name}`);
+
+        // Update the session with the new exercise
+        await this.updateSession(userId, newExercise.id);
+
+        // Generate a prompt for the new exercise using the current strategy
+        const strategy = this.mapService.getCurrentStrategy(userId);
+        const strategyExamples =
+          await this.supabaseService.fetchExamplesByStrategy(strategy);
+        const conversationHistory =
+          await this.supabaseService.fetchChatHistory(userId);
+
+        const prompt = this.generatePromptWithNewExercise(
+          strategy,
+          strategyExamples,
+          newExercise.name,
+          patientDetails,
+          doctorInput,
+          conversationHistory,
+        );
+
+        const gptResponse =
+          await this.generateGPTResponsewithChatHistory(prompt);
+
+        // Save the GPT response in Supabase
+        await this.supabaseService.insertChatHistory(
+          userId,
+          'assistant',
+          gptResponse,
+        );
+
+        return { response: gptResponse };
+      }
 
       if (x_m === 1) {
         return this.handlePersuasionSuccess(userId, currentExercise);
@@ -446,22 +485,25 @@ export class ChatService {
   }
 
   // Determine user's motivation from response
-  async determineUserMotivation(response: string): Promise<number> {
-    console.log('Determining user motivation based on response using GPT...');
+  async determineUserMotivation(
+    response: string,
+  ): Promise<{ motivation: number; wantNewExercise: boolean }> {
+    console.log('Determining user motivation and exercise change request...');
 
-    // Create a refined prompt for GPT to classify motivation correctly
     const prompt = `The user has provided the following response: "${response}". 
-  Based on this input, return the user's motivation level as a number: 
-  1 for High Motivation, 0 for Low Motivation
+    Based on this input, return two pieces of information:
+    1. The user's motivation level as a number: 
+       1 for High Motivation, 0 for Low Motivation
+    2. Whether the user is requesting a different exercise (true or false)
+    
+    Here are examples of responses and how they should be categorized:
+    - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
+    - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
+    - Requesting different exercise: "can we try something else?", "I want a different exercise", "give me another option"
   
-  Here are examples of responses and how they should be categorized:
-  - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
-  - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
-
-  Please respond only with the number.`;
+    Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
 
     try {
-      // Send the refined prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
         model: 'gpt-3.5-turbo',
         messages: [
@@ -470,20 +512,43 @@ export class ChatService {
         ],
       });
 
-      // Parse GPT's response and convert to a number
-      const motivation = parseFloat(
-        chatCompletion.choices[0].message.content.trim(),
-      );
+      const rawResponse = chatCompletion.choices[0].message.content.trim();
+      console.log('Raw GPT response:', rawResponse);
 
-      // Return the parsed number, ensure it's one of the expected values
-      if (motivation === 1 || motivation === 0) {
-        return motivation;
+      let result;
+      try {
+        result = JSON.parse(rawResponse);
+      } catch (parseError) {
+        console.error('Error parsing GPT response:', parseError);
+        // If parsing fails, attempt to extract information manually
+        const motivationMatch = rawResponse.match(/motivation:\s*(\d)/i);
+        const newExerciseMatch = rawResponse.match(
+          /wantNewExercise:\s*(true|false)/i,
+        );
+
+        result = {
+          motivation: motivationMatch ? parseInt(motivationMatch[1]) : 0,
+          wantNewExercise: newExerciseMatch
+            ? newExerciseMatch[1].toLowerCase() === 'true'
+            : false,
+        };
+      }
+
+      // Validate the result
+      if (
+        (result.motivation === 0 || result.motivation === 1) &&
+        typeof result.wantNewExercise === 'boolean'
+      ) {
+        return result;
       } else {
-        throw new Error('Unexpected value returned from GPT.');
+        console.error('Invalid result structure:', result);
+        // Return default values if validation fails
+        return { motivation: 0, wantNewExercise: false };
       }
     } catch (error) {
       console.error('Error determining motivation using GPT:', error);
-      throw new Error('Failed to determine user motivation.');
+      // Return default values in case of any error
+      return { motivation: 0, wantNewExercise: false };
     }
   }
 
