@@ -71,6 +71,6 @@ const styles = StyleSheet.create({
     padding: 15,
     backgroundColor: Colors.NAVY,
     borderRadius: 99,
-    marginTop: '25%',
+    marginTop: '15%',
   },
 });
