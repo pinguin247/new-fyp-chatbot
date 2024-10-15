@@ -162,7 +162,8 @@ export class ChatService {
       // For subsequent messages, use the existing flow
       console.log('Handling subsequent user message...');
 
-      // Determine user's motivation level and if they want a new exercise
+      // Determine user's motivation level
+
       const { motivation: x_m, wantNewExercise } =
         await this.determineUserMotivation(content);
 
@@ -470,7 +471,8 @@ export class ChatService {
   private async generateGPTResponsewithChatHistory(prompt: string) {
     try {
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           // Add conversation history here before the current prompt
@@ -505,7 +507,8 @@ export class ChatService {
 
     try {
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: prompt },
@@ -645,7 +648,7 @@ export class ChatService {
 
     // Complete the prompt using the strategy example and new exercise
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
-    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words.`;
+    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words. Do not include any quotes in the message.`;
 
     return historyPrompt;
   }
@@ -679,7 +682,8 @@ export class ChatService {
     try {
       // Send the updated prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: motivationPrompt },
