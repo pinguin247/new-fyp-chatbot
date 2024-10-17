@@ -23,7 +23,7 @@ export default function Login() {
             marginTop: 10,
           }}
         >
-          FitBuddySG
+          FitBuddy
         </Text>
         <Text
           style={{

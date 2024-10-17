@@ -4,33 +4,34 @@ import { Pie, PieChart, ResponsiveContainer } from "recharts";
 function PieChartComponent() {
   const data02 = [
     {
-      name: "Group A",
-      value: 2400,
+      name: "18-24",
+      value: 5,
     },
     {
-      name: "Group B",
-      value: 4567,
+      name: "25-34",
+      value: 3,
     },
     {
-      name: "Group C",
-      value: 1398,
+      name: "35-44",
+      value: 8,
     },
     {
-      name: "Group D",
-      value: 9800,
+      name: "45-54",
+      value: 0,
     },
     {
-      name: "Group E",
-      value: 3908,
+      name: "55-64",
+      value: 10,
     },
     {
-      name: "Group F",
-      value: 4800,
+      name: "65+",
+      value: 12,
     },
   ];
+
   return (
     <div className="border p-5 rounded-lg">
-      <h2 className="font-bold text-lg">Monthly data</h2>
+      <h2 className="font-bold text-lg">Age Group Distribution</h2>
       <ResponsiveContainer width={"100%"} height={300}>
         <PieChart width={730} height={250}>
           <Pie

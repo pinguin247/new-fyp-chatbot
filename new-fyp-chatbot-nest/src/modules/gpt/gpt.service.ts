@@ -332,7 +332,7 @@ export class ChatService {
     }
 
     // If no free slots are available, modify the prompt
-    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words.`;
+    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words. Do not include any quotes in the message.`;
 
     // Get the GPT response for the no-slot scenario
     const noSlotResponse =
@@ -472,13 +472,14 @@ export class ChatService {
     try {
       const chatCompletion = await this.openai.chat.completions.create({
         //model: 'gpt-3.5-turbo',
-        model: 'gpt-4',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           // Add conversation history here before the current prompt
           ...this.conversationHistory,
           { role: 'user', content: prompt },
         ],
+        temperature: 0.7,
       });
       return chatCompletion.choices[0].message.content;
     } catch (error) {
@@ -508,7 +509,7 @@ export class ChatService {
     try {
       const chatCompletion = await this.openai.chat.completions.create({
         //model: 'gpt-3.5-turbo',
-        model: 'gpt-4',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: prompt },
@@ -683,7 +684,7 @@ export class ChatService {
       // Send the updated prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
         //model: 'gpt-3.5-turbo',
-        model: 'gpt-4',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: motivationPrompt },

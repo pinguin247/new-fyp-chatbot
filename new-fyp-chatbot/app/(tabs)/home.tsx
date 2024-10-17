@@ -62,7 +62,7 @@ const HomePage: React.FC = () => {
             marginTop: '3%',
           }}
         >
-          <Label>Fitness Video</Label>
+          <Label>Exercise Videos</Label>
           <Text
             style={{
               fontFamily: 'Poppins-Regular',
