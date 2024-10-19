@@ -4,7 +4,6 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MapService } from '../map/map.service';
 import { PatientService } from '../patient/patient.service';
 import { ExerciseAllocationService } from '../exercise/exercise_allocation.service';
-import { ExerciseSummaryService } from '../exercise/exercise_summary.service';
 
 import { DateTime } from 'luxon';
 @Injectable()
@@ -20,7 +19,6 @@ export class ChatService {
     private readonly mapService: MapService,
     private readonly patientService: PatientService,
     private readonly exerciseAllocationService: ExerciseAllocationService,
-    private readonly eerciseSummaryService: ExerciseSummaryService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -214,9 +212,9 @@ export class ChatService {
 
       await this.mapService.incrementFailedPersuasionCount(userId);
 
-      if (userSession.persuasionAttempt >= 6) {
+      if (userSession.persuasionAttempt >= 4) {
         console.log(
-          `6th attempt reached for user ${userId}, sending give up message.`,
+          `4th attempt reached for user ${userId}, sending give up message.`,
         );
         // Update strategy weights and handle 6th attempt give-up message
         await this.mapService.updateStrategyWeights(userId, 0);
@@ -295,7 +293,7 @@ export class ChatService {
       );
 
       // Create a prompt for GPT to generate a thank you message with resources and success message
-      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras, each para 70 words)`;
+      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. Keep within 100 words and separate into 2 paragraphs`;
 
       // Get the GPT response for the personalized message
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
