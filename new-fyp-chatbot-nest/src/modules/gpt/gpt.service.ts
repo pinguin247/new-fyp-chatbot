@@ -141,11 +141,13 @@ export class ChatService {
         }
         const strategyExampleText = strategyExamples.join(' ');
 
+        userSession.current_exercise = 'Swimming';
+
         let prompt;
         if (motivationResult === 1) {
-          prompt = `The user responded to the previous message with: "${content}". Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Encourage them to continue their fitness journey and remind them of the positive impact this has on their health. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words. Do not include any quotes in the message.`;
+          prompt = `Explain the health benefits of doing ${userSession.current_exercise} and encourage them to do this exercise. Use persuasion Strategy: ${strategy}. Encourage them to continue and ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
         } else {
-          prompt = `The user responded to the previous message with: "${content}". The user may need additional support. Use the following strategy: ${strategy}. Provide a concise, motivational message recommending the following exercise: ${userSession.current_exercise}. Offer additional support and motivation to encourage them to do the exercise. You can use the following examples for inspiration: "${strategyExampleText}". Try to address what they are feeling. At the end, ask the user if they are interested, and offer to allocate time for them and send resources to guide them through the exercise. Keep the message within 70 words. Do not include any quotes in the message.`;
+          prompt = `Encourage the user to do ${userSession.current_exercise} in a friendly and motivating tone. Use persuasion Strategy: ${strategy}. Keep your response within 70 words. Ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
         }
 
         // Log the prompt that will be sent to GPT
@@ -295,7 +297,7 @@ export class ChatService {
       );
 
       // Create a prompt for GPT to generate a thank you message with resources and success message
-      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras, each para 70 words)`;
+      const prompt = `Thank the user for agreeing to perform the exercise "${currentExercise}". Provide helpful resources and confirm that their exercise has been scheduled. Keep your response within 100 words.`;
 
       // Get the GPT response for the personalized message
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
@@ -332,7 +334,7 @@ export class ChatService {
     }
 
     // If no free slots are available, modify the prompt
-    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words. Do not include any quotes in the message.`;
+    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}, but they don't have any available free time this week. Please generate a thank you message encouraging them to find time to complete the exercise. Keep your response within 70 words.`;
 
     // Get the GPT response for the no-slot scenario
     const noSlotResponse =
@@ -476,7 +478,7 @@ export class ChatService {
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           // Add conversation history here before the current prompt
-          ...this.conversationHistory,
+          //...this.conversationHistory,
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
@@ -493,18 +495,7 @@ export class ChatService {
   ): Promise<{ motivation: number; wantNewExercise: boolean }> {
     console.log('Determining user motivation and exercise change request...');
 
-    const prompt = `The user has provided the following response: "${response}". 
-    Based on this input, return two pieces of information:
-    1. The user's motivation level as a number: 
-       1 for High Motivation, 0 for Low Motivation
-    2. Whether the user is requesting a different exercise (true or false)
-    
-    Here are examples of responses and how they should be categorized:
-    - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
-    - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
-    - Requesting different exercise: "can we try something else?", "I want a different exercise", "give me another option"
-  
-    Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
+    const prompt = `What is the user's motivation level and do they want a different exercise based on their response: "${response}"? Please provide the motivation level as a number (1 for high, 0 for low) and indicate if they want a different exercise (true or false). Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
 
     try {
       const chatCompletion = await this.openai.chat.completions.create({
@@ -514,6 +505,7 @@ export class ChatService {
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: prompt },
         ],
+        temperature: 0.7,
       });
 
       const rawResponse = chatCompletion.choices[0].message.content.trim();
@@ -598,13 +590,15 @@ export class ChatService {
       }\n`;
     });
 
+    currentExercise = 'Swimming';
+
     // Add current context for the new prompt
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `Explain the health benefits of doing ${currentExercise} and encourage them to do this exercise. Use persuasion Strategy: ${strategy}. Keep your response within 70 words.`;
     } else {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use persuasion Strategy: ${strategy}. Keep your response within 70 words.`;
     }
 
     return historyPrompt;
@@ -647,9 +641,11 @@ export class ChatService {
     const exampleToUse =
       strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
 
+    newExercise = 'Badminton';
+
     // Complete the prompt using the strategy example and new exercise
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
-    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words. Do not include any quotes in the message.`;
+    historyPrompt += `Recommend the new exercise, ${newExercise}. Ensure the response is persuasive and motivational. Use persuasion Strategy: ${strategy}. Keep your response within 70 words.`;
 
     return historyPrompt;
   }
@@ -667,18 +663,7 @@ export class ChatService {
     console.log('Determining user motivation based on mood...');
 
     // Update the prompt to make sure GPT understands the context of the first message
-    const motivationPrompt = `The user received the following message: "Hi! How are you feeling today? Let me know, and I can help you with your exercise routine!".
-    The user then responded with: "${content}". Based on this input, determine the user's motivation level.
-  
-    Please return the motivation level as:
-    - 1 for High Motivation (feeling positive or energetic)
-    - 0 for Low Motivation (feeling negative or uninterested).
-  
-    Here are examples for mood-related responses:
-    - High Motivation (1): "I'm great", "feeling awesome", "ready to go", "let's do this", "energetic", "motivated",
-    - Low Motivation (0): "I'm tired", "not feeling it", "meh", "I'm okay", "could be better", "not today", "feeling down".
-  
-    Only respond with the number 1 or 0.`;
+    const motivationPrompt = `Based on the user's response: "${content}", determine the user's motivation level. Please return either 1 for high motivation or 0 for low motivation. Only respond with the number 1 or 0.`;
 
     try {
       // Send the updated prompt to GPT
@@ -689,11 +674,14 @@ export class ChatService {
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: motivationPrompt },
         ],
+        temperature: 0.7,
       });
 
       // Parse GPT's response, which should be either "1" or "0"
       const motivationResponse =
         chatCompletion.choices[0].message.content.trim();
+
+      console.log('MOTIVATION: ', motivationResponse);
 
       // Convert the response to a number and return it
       const motivation = parseInt(motivationResponse, 10);
