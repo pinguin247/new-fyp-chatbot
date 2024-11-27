@@ -145,9 +145,9 @@ export class ChatService {
 
         let prompt;
         if (motivationResult === 1) {
-          prompt = `Explain the health benefits of doing ${userSession.current_exercise} and encourage them to do this exercise. Use persuasion Strategy: ${strategy}. Encourage them to continue and ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
+          prompt = `The user responded with: "${content}". Address what the user said, then explain the health benefits of doing ${userSession.current_exercise} and encourage them to do this exercise. Use persuasion Strategy: ${strategy}. Encourage them to continue and ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
         } else {
-          prompt = `Encourage the user to do ${userSession.current_exercise} in a friendly and motivating tone. Use persuasion Strategy: ${strategy}. Keep your response within 70 words. Ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
+          prompt = `The user responded with: "${content}". Address what the user said, then encourage the user to do ${userSession.current_exercise} in a friendly and motivating tone. Use persuasion Strategy: ${strategy}. Keep your response within 70 words. Ask if they are interested in proceeding with the exercise. Keep your response within 70 words.`;
         }
 
         // Log the prompt that will be sent to GPT
@@ -450,7 +450,7 @@ export class ChatService {
     }
 
     // Give up after 6 failed attempts
-    if (userSession.persuasionAttempt >= 4) {
+    if (userSession.persuasionAttempt >= 3) {
       const giveUpMessage =
         "Alright, it seems you're not interested right now. Let's talk later!";
       this.conversationHistory.push({
@@ -478,7 +478,7 @@ export class ChatService {
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           // Add conversation history here before the current prompt
-          //...this.conversationHistory,
+          ...this.conversationHistory,
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
@@ -495,7 +495,18 @@ export class ChatService {
   ): Promise<{ motivation: number; wantNewExercise: boolean }> {
     console.log('Determining user motivation and exercise change request...');
 
-    const prompt = `What is the user's motivation level and do they want a different exercise based on their response: "${response}"? Please provide the motivation level as a number (1 for high, 0 for low) and indicate if they want a different exercise (true or false). Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
+    const prompt = `The user has provided the following response: "${response}". 
+    Based on this input, return two pieces of information:
+    1. The user's motivation level as a number: 
+       1 for High Motivation, 0 for Low Motivation
+    2. Whether the user is requesting a different exercise (true or false)
+    
+    Here are examples of responses and how they should be categorized:
+    - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
+    - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
+    - Requesting different exercise: "can we try something else?", "I want a different exercise", "give me another option"
+  
+    Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
 
     try {
       const chatCompletion = await this.openai.chat.completions.create({
@@ -596,13 +607,14 @@ export class ChatService {
     historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
 
     if (route === 'central') {
-      historyPrompt += `Explain the health benefits of doing ${currentExercise} and encourage them to do this exercise. Use persuasion Strategy: ${strategy}. Keep your response within 70 words.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise. Use the Persuasion Strategy: ${strategy}, and draw inspiration from these examples: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Try to craft your response catering to the user's demographic and current condition. Keep your response within 70 words. Do not include any quotes in the message.`;
     } else {
-      historyPrompt += `Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use persuasion Strategy: ${strategy}. Keep your response within 70 words.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use the Persuasion Strategy: ${strategy}, and draw inspiration from these examples: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Try to craft your response catering to the user's demographic and current condition. Keep your response within 70 words. Do not include any quotes in the message.`;
     }
 
     return historyPrompt;
   }
+
   generatePromptWithNewExercise(
     strategy: string,
     strategyExamples: string[],
@@ -663,7 +675,14 @@ export class ChatService {
     console.log('Determining user motivation based on mood...');
 
     // Update the prompt to make sure GPT understands the context of the first message
-    const motivationPrompt = `Based on the user's response: "${content}", determine the user's motivation level. Please return either 1 for high motivation or 0 for low motivation. Only respond with the number 1 or 0.`;
+    const motivationPrompt = `The user was asked: "Hi! How are you feeling today? Let me know, and I can help you with your exercise routine!".
+    The user then responded with: "${content}". Based on this input, determine the user's motivation level.
+  
+    Please return the motivation level as:
+    - 1 for High Motivation (feeling positive or energetic) e.g., "I'm great", "feeling great", "ready to go", "let's do this", "energetic", "motivated",
+    - 0 for Low Motivation (feeling negative or uninterested) e.g., "I'm tired", "not feeling it", "meh", "I'm okay", "could be better", "not today", "feeling down".
+  
+    Please respond with the number 1 or 0.`;
 
     try {
       // Send the updated prompt to GPT
