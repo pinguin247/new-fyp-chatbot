@@ -278,6 +278,7 @@ export class MapService {
   getCurrentStrategy(userId: string): string {
     const userSession = this.users[userId];
     const isCentralRoute = userSession.y_c > userSession.y_p;
+    //const isCentralRoute = userSession.y_c >= 0.5 && userSession.y_p < 0.5;
 
     console.log(`\n--- Getting Current Strategy ---`);
     //console.log(`User ID: ${userId}`);
@@ -390,9 +391,9 @@ export class MapService {
     } else {
       // Update weight: wJk(t + 1) = wJk(t) + ΔwJk
       // where ΔwJk = α(1 - wJk)r - δwJk
+      const r = isMotivated ? 1 : 0;
       const deltaWeight =
-        this.LEARNING_RATE * (1 - oldWeight) * (isMotivated ? 1 : 0) -
-        this.DECAY_RATE * oldWeight;
+        this.LEARNING_RATE * (1 - oldWeight) * r - this.DECAY_RATE * oldWeight;
       newWeight = oldWeight + deltaWeight;
 
       // Adjust route activation values

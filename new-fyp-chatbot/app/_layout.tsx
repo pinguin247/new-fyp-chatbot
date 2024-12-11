@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler'; // Add this import
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { NotifierWrapper } from 'react-native-notifier';
 
 export default function RootLayout() {
-  //Fonts are defined here
   const [fontsLoaded] = useFonts({
     'Outfit-Regular': require('./../assets/fonts/Outfit-Regular.ttf'),
     'Outfit-Medium': require('./../assets/fonts/Outfit-Medium.ttf'),
@@ -25,18 +26,16 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      {/* <Stack.Screen
-        name="index"
-        options={{
-          headerShown: false,
-        }}
-      /> */}
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NotifierWrapper>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </NotifierWrapper>
+    </GestureHandlerRootView>
   );
 }

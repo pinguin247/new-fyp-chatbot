@@ -4,7 +4,6 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { MapService } from '../map/map.service';
 import { PatientService } from '../patient/patient.service';
 import { ExerciseAllocationService } from '../exercise/exercise_allocation.service';
-import { ExerciseSummaryService } from '../exercise/exercise_summary.service';
 
 import { DateTime } from 'luxon';
 @Injectable()
@@ -20,7 +19,6 @@ export class ChatService {
     private readonly mapService: MapService,
     private readonly patientService: PatientService,
     private readonly exerciseAllocationService: ExerciseAllocationService,
-    private readonly eerciseSummaryService: ExerciseSummaryService,
   ) {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -164,9 +162,49 @@ export class ChatService {
 
       // Determine user's motivation level
 
-      const x_m = await this.determineUserMotivation(content);
+      const { motivation: x_m, wantNewExercise } =
+        await this.determineUserMotivation(content);
 
-      console.log(`Determined motivation: ${x_m}`);
+      console.log(
+        `Determined motivation: ${x_m}, Want new exercise: ${wantNewExercise}`,
+      );
+
+      if (wantNewExercise) {
+        // Recommend a new exercise without changing the persuasion strategy
+        const newExercise = await this.supabaseService.fetchRandomExercise();
+        console.log(`Recommending new exercise: ${newExercise.name}`);
+
+        // Update the session with the new exercise
+        await this.updateSession(userId, newExercise.id);
+
+        // Generate a prompt for the new exercise using the current strategy
+        const strategy = this.mapService.getCurrentStrategy(userId);
+        const strategyExamples =
+          await this.supabaseService.fetchExamplesByStrategy(strategy);
+        const conversationHistory =
+          await this.supabaseService.fetchChatHistory(userId);
+
+        const prompt = this.generatePromptWithNewExercise(
+          strategy,
+          strategyExamples,
+          newExercise.name,
+          patientDetails,
+          doctorInput,
+          conversationHistory,
+        );
+
+        const gptResponse =
+          await this.generateGPTResponsewithChatHistory(prompt);
+
+        // Save the GPT response in Supabase
+        await this.supabaseService.insertChatHistory(
+          userId,
+          'assistant',
+          gptResponse,
+        );
+
+        return { response: gptResponse };
+      }
 
       if (x_m === 1) {
         return this.handlePersuasionSuccess(userId, currentExercise);
@@ -174,9 +212,9 @@ export class ChatService {
 
       await this.mapService.incrementFailedPersuasionCount(userId);
 
-      if (userSession.persuasionAttempt >= 6) {
+      if (userSession.persuasionAttempt >= 4) {
         console.log(
-          `6th attempt reached for user ${userId}, sending give up message.`,
+          `4th attempt reached for user ${userId}, sending give up message.`,
         );
         // Update strategy weights and handle 6th attempt give-up message
         await this.mapService.updateStrategyWeights(userId, 0);
@@ -255,7 +293,7 @@ export class ChatService {
       );
 
       // Create a prompt for GPT to generate a thank you message with resources and success message
-      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. (at most 3 paras, each para 70 words)`;
+      const prompt = `The user has agreed to perform the exercise: ${currentExercise}. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively, and inform them that the exercise has been scheduled successfully on ${formattedMessage}. Keep within 100 words and separate into 2 paragraphs`;
 
       // Get the GPT response for the personalized message
       const gptResponse = await this.generateGPTResponsewithChatHistory(prompt);
@@ -292,7 +330,7 @@ export class ChatService {
     }
 
     // If no free slots are available, modify the prompt
-    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words.`;
+    const noSlotPrompt = `The user has agreed to perform the exercise: ${currentExercise}. However, it seems that the user has no available free slots this week. Please generate a thank you message expressing encouragement, provide links (in full) or resources that would help them complete the exercise effectively. Furthermore, encouraging the user to try finding a pocket of time in their schedule to attempt the exercise. Keep the message concise and motivational. Keep the message within 70 words. Do not include any quotes in the message.`;
 
     // Get the GPT response for the no-slot scenario
     const noSlotResponse =
@@ -339,7 +377,7 @@ export class ChatService {
     // On the 3rd attempt, recommend a new exercise and use a dynamic prompt
     if (userSession.persuasionAttempt === 2) {
       console.log(
-        `2rd attempt reached for user ${userId}, recommending a new exercise.`,
+        `2nd attempt reached for user ${userId}, recommending a new exercise.`,
       );
 
       // Fetch a new exercise
@@ -431,13 +469,15 @@ export class ChatService {
   private async generateGPTResponsewithChatHistory(prompt: string) {
     try {
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           // Add conversation history here before the current prompt
           ...this.conversationHistory,
           { role: 'user', content: prompt },
         ],
+        temperature: 0.7,
       });
       return chatCompletion.choices[0].message.content;
     } catch (error) {
@@ -446,44 +486,71 @@ export class ChatService {
   }
 
   // Determine user's motivation from response
-  async determineUserMotivation(response: string): Promise<number> {
-    console.log('Determining user motivation based on response using GPT...');
+  async determineUserMotivation(
+    response: string,
+  ): Promise<{ motivation: number; wantNewExercise: boolean }> {
+    console.log('Determining user motivation and exercise change request...');
 
-    // Create a refined prompt for GPT to classify motivation correctly
     const prompt = `The user has provided the following response: "${response}". 
-  Based on this input, return the user's motivation level as a number: 
-  1 for High Motivation, 0 for Low Motivation
+    Based on this input, return two pieces of information:
+    1. The user's motivation level as a number: 
+       1 for High Motivation, 0 for Low Motivation
+    2. Whether the user is requesting a different exercise (true or false)
+    
+    Here are examples of responses and how they should be categorized:
+    - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
+    - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
+    - Requesting different exercise: "can we try something else?", "I want a different exercise", "give me another option"
   
-  Here are examples of responses and how they should be categorized:
-  - High Motivation (1): "yes", "sure", "okay", "let's do it", "great", "awesome"
-  - Low Motivation (0): "no", "not interested", "maybe later", "I'm too busy", "I don't want to"
-
-  Please respond only with the number.`;
+    Please respond in the format: {"motivation": number, "wantNewExercise": boolean}`;
 
     try {
-      // Send the refined prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: prompt },
         ],
       });
 
-      // Parse GPT's response and convert to a number
-      const motivation = parseFloat(
-        chatCompletion.choices[0].message.content.trim(),
-      );
+      const rawResponse = chatCompletion.choices[0].message.content.trim();
+      console.log('Raw GPT response:', rawResponse);
 
-      // Return the parsed number, ensure it's one of the expected values
-      if (motivation === 1 || motivation === 0) {
-        return motivation;
+      let result;
+      try {
+        result = JSON.parse(rawResponse);
+      } catch (parseError) {
+        console.error('Error parsing GPT response:', parseError);
+        // If parsing fails, attempt to extract information manually
+        const motivationMatch = rawResponse.match(/motivation:\s*(\d)/i);
+        const newExerciseMatch = rawResponse.match(
+          /wantNewExercise:\s*(true|false)/i,
+        );
+
+        result = {
+          motivation: motivationMatch ? parseInt(motivationMatch[1]) : 0,
+          wantNewExercise: newExerciseMatch
+            ? newExerciseMatch[1].toLowerCase() === 'true'
+            : false,
+        };
+      }
+
+      // Validate the result
+      if (
+        (result.motivation === 0 || result.motivation === 1) &&
+        typeof result.wantNewExercise === 'boolean'
+      ) {
+        return result;
       } else {
-        throw new Error('Unexpected value returned from GPT.');
+        console.error('Invalid result structure:', result);
+        // Return default values if validation fails
+        return { motivation: 0, wantNewExercise: false };
       }
     } catch (error) {
       console.error('Error determining motivation using GPT:', error);
-      throw new Error('Failed to determine user motivation.');
+      // Return default values in case of any error
+      return { motivation: 0, wantNewExercise: false };
     }
   }
 
@@ -530,12 +597,12 @@ export class ChatService {
     });
 
     // Add current context for the new prompt
-    historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}". Read the replies of the user from the start of the conversation and use that as context to address the user’s concern in their latest reply. It is important that you encourage the user to do ${currentExercise}. `;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message. Remember, your goal is to encourage user to do ${currentExercise}. `;
     } else {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message. Remember, your goal is to encourage user to do ${currentExercise}. `;
     }
 
     return historyPrompt;
@@ -579,8 +646,8 @@ export class ChatService {
       strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
 
     // Complete the prompt using the strategy example and new exercise
-    historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
-    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words.`;
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}".  Read the replies of the user from the start of the conversation and use that as context to address the user’s concern in their latest reply. It is important that you encourage the user to do ${newExercise}. `;
+    historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words. Do not include any quotes in the message.`;
 
     return historyPrompt;
   }
@@ -614,7 +681,8 @@ export class ChatService {
     try {
       // Send the updated prompt to GPT
       const chatCompletion = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        //model: 'gpt-3.5-turbo',
+        model: 'gpt-4-turbo',
         messages: [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: motivationPrompt },

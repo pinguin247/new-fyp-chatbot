@@ -50,7 +50,9 @@ const Card: React.FC<CardProps> = ({ data, index }) => {
         />
       </View>
       <View>
-        <Text style={{ fontSize: 10, fontFamily: 'Poppins-Light' }}>Day 1</Text>
+        <Text style={{ fontSize: 10, fontFamily: 'Poppins-Light' }}>
+          Tuesday
+        </Text>
         <Text style={{ fontSize: 10, fontFamily: 'Poppins-Light' }}>
           Time 20 min
         </Text>
