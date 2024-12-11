@@ -377,7 +377,7 @@ export class ChatService {
     // On the 3rd attempt, recommend a new exercise and use a dynamic prompt
     if (userSession.persuasionAttempt === 2) {
       console.log(
-        `2rd attempt reached for user ${userId}, recommending a new exercise.`,
+        `2nd attempt reached for user ${userId}, recommending a new exercise.`,
       );
 
       // Fetch a new exercise
@@ -597,12 +597,12 @@ export class ChatService {
     });
 
     // Add current context for the new prompt
-    historyPrompt += `\nThe user responded with: "${lastUserResponse}". Address user's response at the start.`;
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}". Read the replies of the user from the start of the conversation and use that as context to address the user’s concern in their latest reply. It is important that you encourage the user to do ${currentExercise}. `;
 
     if (route === 'central') {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Now, explain the health benefits of doing ${currentExercise} and encourage them to do this exercise, drawing inspiration from these examples: "${strategyExamples}". Please generate a unique concise response based on this but do not copy the examples exactly. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message. Remember, your goal is to encourage user to do ${currentExercise}. `;
     } else {
-      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message.`;
+      historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Encourage the user to do ${currentExercise} in a friendly and motivating tone. Use these examples for inspiration: "${strategyExamples}". Create a unique concise response that is based on but does not exactly copy the examples. Strategy: ${strategy}. Try to craft your response catering to the demographic as well. Keep the message within 70 words. Do not include any quotes in the message. Remember, your goal is to encourage user to do ${currentExercise}. `;
     }
 
     return historyPrompt;
@@ -646,7 +646,7 @@ export class ChatService {
       strategyExamples[Math.floor(Math.random() * strategyExamples.length)];
 
     // Complete the prompt using the strategy example and new exercise
-    historyPrompt += `\nThe user responded with: "${lastUserResponse}". `;
+    historyPrompt += `\nThe user responded with: "${lastUserResponse}".  Read the replies of the user from the start of the conversation and use that as context to address the user’s concern in their latest reply. It is important that you encourage the user to do ${newExercise}. `;
     historyPrompt += `For background info, this patient is ${age} years old, and is ${gender}. The patient has a medical condition of ${medical_condition} and their disability level is ${disability_level}. Recommend the new exercise, ${newExercise}, using this example as inspiration: "${exampleToUse}". Ensure the response is persuasive and motivational but does not directly copy the example. Strategy: ${strategy}. Try to craft your response catering to the demographic as well within 70 words. Do not include any quotes in the message.`;
 
     return historyPrompt;
